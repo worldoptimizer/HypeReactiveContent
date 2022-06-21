@@ -1,4 +1,7 @@
-# HypeReactiveContent
+# Hype Reactive Content
+
+![HypeReactiveContent|690x487](https://playground.maxziebell.de/Hype/ReactiveContent/HypeReactiveContent.jpg)
+
 A small custom tailored extension to use hypeDocument.customData in a reactive manner.
 
 
