@@ -1,6 +1,6 @@
 
 /*!
-Hype Reactive Content 1.0.2
+Hype Reactive Content 1.0.3
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -8,6 +8,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.0 Initial release under MIT-license
 * 1.0.1 Refactored naming and release on GitHub
 * 1.0.2 This version is being released to get JsDelivr to update
+* 1.0.3 Changed listener syntax to sentence structure
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 	/**
@@ -63,8 +64,9 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 * @param {object} event - the event
 	 */
 	function HypeDocumentLoad(hypeDocument, element, event){
-		hypeDocument.updateVars = function(key, value) {
-			if (key && value) hypeDocument.triggerCustomBehaviorNamed(key + ' == ' + (typeof value === 'string' ? '"' + value + '"' : value))
+		hypeDocument.updateContent = function(key, value) {
+			if (key && value) hypeDocument.triggerCustomBehaviorNamed(key + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value))
+			if (key) hypeDocument.triggerCustomBehaviorNamed(key + ' was updated')
 			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
 			sceneElm.querySelectorAll('[data-content], [data-visibility]').forEach(function(elm){
 				var content = elm.getAttribute('data-content');
@@ -82,7 +84,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 				console.error(e)
 			}
 		}
-		hypeDocument.customData = enableReactiveObject(hypeDocument.customData, debounceByRequestFrame(hypeDocument.updateVars));
+		hypeDocument.customData = enableReactiveObject(hypeDocument.customData, debounceByRequestFrame(hypeDocument.updateContent));
 		if (hypeDocument.functions().HypeReactiveContent) hypeDocument.functions().HypeReactiveContent(hypeDocument, element, event);
 	}
 	
@@ -92,7 +94,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	function HypeScenePrepareForDisplay(hypeDocument, element, event) {
-		hypeDocument.updateVars()
+		hypeDocument.updateContent()
 	}
 
 	if ("HYPE_eventListeners" in window === false) { window.HYPE_eventListeners = Array(); }
@@ -101,6 +103,6 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	window.HYPE_eventListeners.push({type: "HypeScenePrepareForDisplay", callback: HypeScenePrepareForDisplay});
 	
 	return {
-		version: '1.0.2'
+		version: '1.0.3'
 	};
 })();
