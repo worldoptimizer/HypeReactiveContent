@@ -1,6 +1,5 @@
-
 /*!
-Hype Reactive Content 1.0.3
+Hype Reactive Content 1.0.4
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -9,6 +8,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.1 Refactored naming and release on GitHub
 * 1.0.2 This version is being released to get JsDelivr to update
 * 1.0.3 Changed listener syntax to sentence structure
+* 1.0.4 Fixed falsy values not being updated
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 	/**
@@ -65,12 +65,13 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 */
 	function HypeDocumentLoad(hypeDocument, element, event){
 		hypeDocument.updateContent = function(key, value) {
-			if (key && value) hypeDocument.triggerCustomBehaviorNamed(key + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value))
-			if (key) hypeDocument.triggerCustomBehaviorNamed(key + ' was updated')
+			if (key!==undefined && value!==undefined) hypeDocument.triggerCustomBehaviorNamed(key + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value))
+			if (key!==undefined) hypeDocument.triggerCustomBehaviorNamed(key + ' was updated')
 			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
 			sceneElm.querySelectorAll('[data-content], [data-visibility]').forEach(function(elm){
 				var content = elm.getAttribute('data-content');
-				if (content) elm.innerHTML = hypeDocument.runCode(content, true) || '';
+				var contentReturn = hypeDocument.runCode(content, true);
+				if (content) elm.innerHTML =  contentReturn!==undefined? contentReturn : '';
 				var visibility = elm.getAttribute('data-visibility');
 				if (visibility) elm.style.visibility = hypeDocument.runCode(visibility, true)? 'visible': 'hidden';
 				
@@ -103,6 +104,6 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	window.HYPE_eventListeners.push({type: "HypeScenePrepareForDisplay", callback: HypeScenePrepareForDisplay});
 	
 	return {
-		version: '1.0.3'
+		version: '1.0.4'
 	};
 })();
