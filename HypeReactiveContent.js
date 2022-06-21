@@ -3,7 +3,11 @@
 Hype Reactive Content 1.0.1
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
-
+/*
+* Version-History
+* 1.0.0 Initial release under MIT-license
+* 1.0.1 Refactored naming and release on GitHub
+*/
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 	/**
  	 * @function enableReactiveObject
