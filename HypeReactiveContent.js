@@ -1,12 +1,13 @@
 
 /*!
-Hype Reactive Content 1.0.1
+Hype Reactive Content 1.0.2
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
 * Version-History
 * 1.0.0 Initial release under MIT-license
 * 1.0.1 Refactored naming and release on GitHub
+* 1.0.2 This version is being released to get JsDelivr to update
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 	/**
@@ -100,6 +101,6 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	window.HYPE_eventListeners.push({type: "HypeScenePrepareForDisplay", callback: HypeScenePrepareForDisplay});
 	
 	return {
-		version: '1.0.1'
+		version: '1.0.2'
 	};
 })();
