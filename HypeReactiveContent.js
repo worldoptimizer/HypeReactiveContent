@@ -9,7 +9,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.2 This version is being released to get JsDelivr to update
 * 1.0.3 Changed listener syntax to sentence structure
 * 1.0.4 Fixed falsy values not being updated
-* 1.0.5 Added Hype Action Events support, running code through triggerAction
+* 1.0.5 Added Hype Action Events support running code through triggerAction
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 	/**
