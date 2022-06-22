@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.0.5
+Hype Reactive Content 1.0.6
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -10,38 +10,76 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.3 Changed listener syntax to sentence structure
 * 1.0.4 Fixed falsy values not being updated
 * 1.0.5 Added Hype Action Events support running code through triggerAction
+* 1.0.6 Added Hype Data Magic support, disable with HypeDataMagic.setDefault('refreshOnCustomData', false)
+*       Added and exposed HypeReactiveContent.disableReactiveObject, Exposed HypeReactiveContent.enableReactiveObject
+*       Improved runCode running in hypeDocument scope while still accessing customData
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
+
 	/**
-	  * @function enableReactiveObject
-	  * @param {object} obj - the object to be made reactive.
-	  * @param {function} callback - the function to be called when a property of the object is changed.
-	  * @returns {object} - the reactive object.
-	  */
-	 function enableReactiveObject(obj, callback) {
-		const handler = {
-			get(target, key, receiver) {
+	 * Helper to determine if an object is reactive by checking __isReactive.
+	 *
+	 * @param {Object} obj - The object to check.
+	 * @returns {boolean} - True if the object is reactive, false otherwise.
+	 */
+	let isProxy = Symbol("isProxy")
+	 
+	function isReactive(obj) {
+		return obj[isProxy];
+	};
+	
+	/**
+	 * This function makes an object reactive and fires a callback on set operations
+	 *
+	 * @param {Object} obj This the object that should be made reactive
+	 * @param {Function} callback This is function that should be called
+	 * @return Returns the object as a proxy
+	 */
+	function enableReactiveObject(obj, callback, handlerOverride) {
+		if (isReactive(obj)) return obj;
+		handlerOverride = handlerOverride || {};
+		const handler = Object.assign({
+			get: function(target, key, receiver) {
+				if (key === isProxy) return true;
 				const result = Reflect.get(target, key, receiver);
 				if (typeof result === 'object') {
 					return enableReactiveObject(result, callback);
 				}
 				return result;
 			},
-			set(target, key, value, receiver) {
-				const result = Reflect.set(target, key, value, receiver);				
+			set: function(target, key, value, receiver) {
+				const result = Reflect.set(target, key, value, receiver);
 				callback(key, value, target, receiver);
 				return result;
-			},
-			has(target, key, receiver) {
-				if (key=='hypeDocument') return false;
-				if (!target.hasOwnProperty(key) && !window[key]) return true;
-				return Reflect.has(target, key, receiver)
-			},
-		};
+			}
+		}, handlerOverride.topLevel || handlerOverride);
 		const proxy = new Proxy(obj, handler);
 		return proxy;
 	}
-
+	
+	/**
+	 * This function makes an object non-reactive
+	 *
+	 * @param {Object} obj This the object that should be made non-reactive
+	 * @return Returns the object as a non-reactive object
+	 */
+	function disableReactiveObject(obj) {
+		if (!isReactive(obj)) return obj;
+	
+		const result = {};
+		for (const key in obj) {
+			if (obj.hasOwnProperty(key)) {
+				const value = obj[key];
+				if (typeof value === 'object') {
+					result[key] = disableReactiveObject(value);
+				} else {
+					result[key] = value;
+				}
+			}
+		}
+		return result;
+	}
+	
 	/**
 	 * @function debounceByRequestFrame
 	 * @param {function} fn - the function to be debounced
@@ -66,7 +104,23 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 */
 	function runCode(code, hypeDocument) {
 		try {
-			return new Function('hypeDocument', 'customData', 'with(customData){ ' + code + '}')(hypeDocument, hypeDocument.customData);
+			let $context = new Proxy(Object.assign({}, hypeDocument), {
+				set (target, key, val, receiver) {
+					if (!Reflect.get(target, key, receiver)) return Reflect.set(hypeDocument.customData, key, val);
+					return Reflect.set(target, key, val, receiver);
+				},
+				get(target, key, receiver) {
+					var value = Reflect.get(target, key, receiver);
+					if (value) return value;
+					return Reflect.get(hypeDocument.customData, key);
+				},
+				has(target, key, receiver) {
+					if (key=='hypeDocument') return false;
+					if (!target.hasOwnProperty(key) && !window[key]) return true;
+					return Reflect.has(target, key, receiver)
+				},
+			});
+			return new Function('$context', 'with($context){ ' + code + '}')($context);
 		} catch (e) {
 			console.error(e)
 		}
@@ -80,7 +134,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 */
 	function HypeDocumentLoad(hypeDocument, element, event) {
 		
-		hypeDocument.updateContent = function(key, value) {
+		hypeDocument.refreshReactiveContent = function(key, value) {
 			if (key!==undefined && value!==undefined) hypeDocument.triggerCustomBehaviorNamed(key + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value))
 			if (key!==undefined) hypeDocument.triggerCustomBehaviorNamed(key + ' was updated')
 			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
@@ -102,14 +156,18 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 						elm.innerHTML = contentReturn!==undefined? contentReturn : '';
 					}
 					if (visibility) {
-						let visibilityReturn = hypeDocument.triggerAction ('return '+visibility, { element: elm, event: {type:'HypeReactiveContent'}});
+						let visibilityReturn = hypeDocument.triggerAction ('return '+visibility, { element: elm, event: {type:'HypeReactiveVisibility'}});
 						elm.style.visibility = visibilityReturn? 'visible': 'hidden';
 					}
 				}
-			})	
+			})
+			
+			if ("HypeDataMagic" in window !== false) {
+				if (HypeDataMagic.getDefault('refreshOnCustomData')) hypeDocument.refresh();
+			}	
 		}
 		
-		hypeDocument.customData = enableReactiveObject(hypeDocument.customData, debounceByRequestFrame(hypeDocument.updateContent));
+		hypeDocument.customData = enableReactiveObject(hypeDocument.customData, debounceByRequestFrame(hypeDocument.refreshReactiveContent));
 		if (hypeDocument.functions().HypeReactiveContent) hypeDocument.functions().HypeReactiveContent(hypeDocument, element, event);
 	}
 	
@@ -120,7 +178,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	function HypeScenePrepareForDisplay(hypeDocument, element, event) {
-		hypeDocument.updateContent()
+		hypeDocument.refreshReactiveContent()
 	}
 
 	if ("HYPE_eventListeners" in window === false) { window.HYPE_eventListeners = Array(); }
@@ -131,6 +189,9 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 		
 	return {
-		version: '1.0.5'
+		version: '1.0.6',
+		enableReactiveObject: enableReactiveObject,
+		disableReactiveObject: disableReactiveObject,
+		debounceByRequestFrame: debounceByRequestFrame,
 	};
 })();
