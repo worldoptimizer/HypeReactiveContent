@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.0.6
+Hype Reactive Content 1.0.7
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -13,6 +13,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.6 Added Hype Data Magic support, disable with HypeDataMagic.setDefault('refreshOnCustomData', false)
 *       Added and exposed HypeReactiveContent.disableReactiveObject, Exposed HypeReactiveContent.enableReactiveObject
 *       Improved runCode running in hypeDocument scope while still accessing customData
+* 1.0.7 Fixed small regression in the runCode enclosure for has probes
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -115,7 +116,6 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 					return Reflect.get(hypeDocument.customData, key);
 				},
 				has(target, key, receiver) {
-					if (key=='hypeDocument') return false;
 					if (!target.hasOwnProperty(key) && !window[key]) return true;
 					return Reflect.has(target, key, receiver)
 				},
@@ -189,7 +189,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 		
 	return {
-		version: '1.0.6',
+		version: '1.0.7',
 		enableReactiveObject: enableReactiveObject,
 		disableReactiveObject: disableReactiveObject,
 		debounceByRequestFrame: debounceByRequestFrame,
