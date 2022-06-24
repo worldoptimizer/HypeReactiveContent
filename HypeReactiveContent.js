@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.0.7
+Hype Reactive Content 1.0.8
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -14,6 +14,8 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added and exposed HypeReactiveContent.disableReactiveObject, Exposed HypeReactiveContent.enableReactiveObject
 *       Improved runCode running in hypeDocument scope while still accessing customData
 * 1.0.7 Fixed small regression in the runCode enclosure for has probes
+* 1.0.8 Visibility changes switch display none to block if needed, debounced HypeTriggerCustomBehavior
+*       Added compatibility with Hype Global Behavior
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -148,6 +150,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 					}
 					if (visibility) {
 						let visibilityReturn = runCode('return '+visibility, hypeDocument);
+						if (elm.style.display == 'none') elm.style.display = 'block';
 						elm.style.visibility = visibilityReturn? 'visible': 'hidden';
 					}
 				} else {
@@ -157,6 +160,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 					}
 					if (visibility) {
 						let visibilityReturn = hypeDocument.triggerAction ('return '+visibility, { element: elm, event: {type:'HypeReactiveVisibility'}});
+						if (elm.style.display == 'none') elm.style.display = 'block';
 						elm.style.visibility = visibilityReturn? 'visible': 'hidden';
 					}
 				}
@@ -166,19 +170,20 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 				if (HypeDataMagic.getDefault('refreshOnCustomData')) hypeDocument.refresh();
 			}	
 		}
-		
-		hypeDocument.customData = enableReactiveObject(hypeDocument.customData, debounceByRequestFrame(hypeDocument.refreshReactiveContent));
+		hypeDocument.refreshReactiveContentDebounced = debounceByRequestFrame(hypeDocument.refreshReactiveContent);
+		hypeDocument.customData = enableReactiveObject(hypeDocument.customData, hypeDocument.refreshReactiveContentDebounced);
 		if (hypeDocument.functions().HypeReactiveContent) hypeDocument.functions().HypeReactiveContent(hypeDocument, element, event);
 	}
 	
 	function HypeTriggerCustomBehavior(hypeDocument, element, event) {
 		if ("HypeActionEvents" in window !== false) return;
 		var code = event.customBehaviorName;
+		if (code.charAt(0) == '#') return;
 		if (/[;=()]/.test(code)) runCode(code, hypeDocument);
 	}
 	
 	function HypeScenePrepareForDisplay(hypeDocument, element, event) {
-		hypeDocument.refreshReactiveContent()
+		hypeDocument.refreshReactiveContentDebounced();
 	}
 
 	if ("HYPE_eventListeners" in window === false) { window.HYPE_eventListeners = Array(); }
@@ -189,7 +194,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 		
 	return {
-		version: '1.0.7',
+		version: '1.0.8',
 		enableReactiveObject: enableReactiveObject,
 		disableReactiveObject: disableReactiveObject,
 		debounceByRequestFrame: debounceByRequestFrame,
