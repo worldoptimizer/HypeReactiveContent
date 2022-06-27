@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.0.9
+Hype Reactive Content 1.1.0
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -18,6 +18,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added compatibility with Hype Global Behavior
 * 1.0.9 Added isCode and setting a function in customData will not trigger and 'equals' behavior anymore
         Added setDefault and getDefault, added customDataUpdate (callback) as default possibility
+* 1.1.0 Added hypeDocument.enableReactiveCustomData and the default customData
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -217,7 +218,14 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			}	
 		}
 		hypeDocument.refreshReactiveContentDebounced = debounceByRequestFrame(hypeDocument.refreshReactiveContent);
-		hypeDocument.customData = enableReactiveObject(hypeDocument.customData, hypeDocument.refreshReactiveContentDebounced);
+		
+		hypeDocument.enableReactiveCustomData = function(data){
+			hypeDocument.customData = Object.assign(hypeDocument.customData, data || {});
+			hypeDocument.customData = enableReactiveObject(hypeDocument.customData, hypeDocument.refreshReactiveContentDebounced);	
+		}
+		
+		hypeDocument.enableReactiveCustomData(getDefault('customData') || {})
+		
 		if (hypeDocument.functions().HypeReactiveContent) hypeDocument.functions().HypeReactiveContent(hypeDocument, element, event);
 	}
 	
@@ -240,7 +248,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 		
 	return {
-		version: '1.0.9',
+		version: '1.1.0',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
