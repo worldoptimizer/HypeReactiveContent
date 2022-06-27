@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.0.8
+Hype Reactive Content 1.0.9
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -16,8 +16,44 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.7 Fixed small regression in the runCode enclosure for has probes
 * 1.0.8 Visibility changes switch display none to block if needed, debounced HypeTriggerCustomBehavior
 *       Added compatibility with Hype Global Behavior
+* 1.0.9 Added isCode and setting a function in customData will not trigger and 'equals' behavior anymore
+        Added setDefault and getDefault, added customDataUpdate (callback) as default possibility
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
+
+	_default = {}
+
+	/**
+	 * This function allows to override a global default by key or if a object is given as key to override all default at once
+	 *
+	 * @param {String} key This is the key to override
+	 * @param {String|Function|Object} value This is the value to set for the key
+	 */
+	 function setDefault(key, value){
+		//allow setting all defaults
+		if (typeof(key) == 'object') {
+			_default = key;
+			return;
+		}
+	
+		//set specific default
+		_default[key] = value;
+	}
+	
+	/**
+	 * This function returns the value of a default by key or all default if no key is given
+	 *
+	 * @param {String} key This the key of the default.
+	 * @return Returns the current value for a default with a certain key.
+	 */
+	function getDefault(key){
+		// return all defaults if no key is given
+		if (!key) return _default;
+	
+		// return specific default
+		return _default[key];
+	}
+
 
 	/**
 	 * Helper to determine if an object is reactive by checking __isReactive.
@@ -128,6 +164,10 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		}
 	}
 	
+	function isCode(code){
+		return /[;=()]/.test(code);
+	}
+	
 	/**
 	 * @function HypeDocumentLoad
 	 * @param {object} hypeDocument - the hypeDocument
@@ -137,8 +177,14 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	function HypeDocumentLoad(hypeDocument, element, event) {
 		
 		hypeDocument.refreshReactiveContent = function(key, value) {
-			if (key!==undefined && value!==undefined) hypeDocument.triggerCustomBehaviorNamed(key + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value))
-			if (key!==undefined) hypeDocument.triggerCustomBehaviorNamed(key + ' was updated')
+			if (key!==undefined && value!==undefined && !isCode(value)) {
+				hypeDocument.triggerCustomBehaviorNamed(key + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
+			}
+			if (key!==undefined) {
+				if (getDefault('customDataUpdate')) getDefault('customDataUpdate')(key, value);
+				hypeDocument.triggerCustomBehaviorNamed('customData was changed');
+				hypeDocument.triggerCustomBehaviorNamed(key + ' was updated');
+			}
 			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
 			sceneElm.querySelectorAll('[data-content], [data-visibility]').forEach(function(elm){
 				let content = elm.getAttribute('data-content');
@@ -179,7 +225,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		if ("HypeActionEvents" in window !== false) return;
 		var code = event.customBehaviorName;
 		if (code.charAt(0) == '#') return;
-		if (/[;=()]/.test(code)) runCode(code, hypeDocument);
+		if (isCode(code)) runCode(code, hypeDocument);
 	}
 	
 	function HypeScenePrepareForDisplay(hypeDocument, element, event) {
@@ -194,7 +240,9 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 		
 	return {
-		version: '1.0.8',
+		version: '1.0.9',
+		setDefault: setDefault,
+		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
 		disableReactiveObject: disableReactiveObject,
 		debounceByRequestFrame: debounceByRequestFrame,
