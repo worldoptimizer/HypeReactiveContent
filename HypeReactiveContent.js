@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.1.1
+Hype Reactive Content 1.1.2
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -20,8 +20,9 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 		Added setDefault and getDefault, added customDataUpdate (callback) as default possibility
 * 1.1.0 Added hypeDocument.enableReactiveCustomData and the default customData
 * 1.1.1 Fixed null case and added reactive highlighting in IDE
-*       Added data-scope and scope indicator at beginning of expressions with the arrow symbol (⇢) 
+*       Added data-scope and scope indicator at beginning of expressions with the arrow symbol (⇢)
 *       Added the ability to inline the scope in data-content before the arrow symbol (⇢)
+* 1.1.2 Minor cleanups and fixes
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -225,13 +226,13 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 */
 	function HypeDocumentLoad(hypeDocument, element, event) {
 		
-		hypeDocument.refreshReactiveContent = function(key, value) {
+		hypeDocument.refreshReactiveContent = function(key, value, target, receiver) {
 			if (key!==undefined && value!==undefined && !isCode(value)) {
 				hypeDocument.triggerCustomBehaviorNamed(key + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
 			}
 			
 			if (key!==undefined) {
-				if (getDefault('customDataUpdate')) getDefault('customDataUpdate')(key, value);
+				if (getDefault('customDataUpdate')) getDefault('customDataUpdate')(key, value, target, receiver);
 				hypeDocument.triggerCustomBehaviorNamed('customData was changed');
 				hypeDocument.triggerCustomBehaviorNamed(key + ' was updated');
 			}
@@ -348,9 +349,8 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 					"[data-content][data-visibility]::before{content: attr(data-content) ' "+getDefault('visibilitySymbol')+" ' attr(data-visibility)}",
 				]);
 				
-				//if (getDefault('highlightVisibilityArea')) 
-				rules = rules.concat([	
-					"[data-visibility]::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--color) 10px,var(--color) 20px);opacity: .25;}",
+				if (getDefault('highlightVisibilityArea')) rules = rules.concat([	
+					"[data-visibility]::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--color) 10px,var(--color) 20px);opacity: .1;}",
 				]);
 					
 				rules.forEach((rule)=> document.styleSheets[0].insertRule(rule,0));
@@ -359,7 +359,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	return {
-		version: '1.1.1',
+		version: '1.1.2',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
