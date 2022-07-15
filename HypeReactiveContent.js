@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.1.0
+Hype Reactive Content 1.1.1
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -17,12 +17,27 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.0.8 Visibility changes switch display none to block if needed, debounced HypeTriggerCustomBehavior
 *       Added compatibility with Hype Global Behavior
 * 1.0.9 Added isCode and setting a function in customData will not trigger and 'equals' behavior anymore
-        Added setDefault and getDefault, added customDataUpdate (callback) as default possibility
+		Added setDefault and getDefault, added customDataUpdate (callback) as default possibility
 * 1.1.0 Added hypeDocument.enableReactiveCustomData and the default customData
+* 1.1.1 Fixed null case and added reactive highlighting in IDE
+*       Added data-scope and scope indicator at beginning of expressions with the package emoji
+*       Added the ability to inline the scope in data-content before the package emoji
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
-	_default = {}
+	/* @const */
+	const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
+
+	_default = {
+		highlightReactiveContent: true,
+		highlightVisibilityData: true,
+		highlightVisibilityArea: true,
+		highlightContentData: true,
+		highlightScopeData: true,
+		scopeSymbol: '⇢',
+		scopeSymbolLength: 1,
+		visibilitySymbol: '👁',
+	}
 
 	/**
 	 * This function allows to override a global default by key or if a object is given as key to override all default at once
@@ -75,10 +90,9 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 * @param {Function} callback This is function that should be called
 	 * @return Returns the object as a proxy
 	 */
-	function enableReactiveObject(obj, callback, handlerOverride) {
-		if (isReactive(obj)) return obj;
-		handlerOverride = handlerOverride || {};
-		const handler = Object.assign({
+	function enableReactiveObject(obj, callback) {
+		if (obj == null || isReactive(obj)) return obj;
+		const handler = {
 			get: function(target, key, receiver) {
 				if (key === isProxy) return true;
 				const result = Reflect.get(target, key, receiver);
@@ -92,7 +106,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 				callback(key, value, target, receiver);
 				return result;
 			}
-		}, handlerOverride.topLevel || handlerOverride);
+		}
 		const proxy = new Proxy(obj, handler);
 		return proxy;
 	}
@@ -142,31 +156,65 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 * @param {string} code JavaScript to run
 	 * @param {HYPE.documents.API} hypeDocument for context
 	 */
-	function runCode(code, hypeDocument) {
-		try {
-			let $context = new Proxy(Object.assign({}, hypeDocument), {
-				set (target, key, val, receiver) {
-					if (!Reflect.get(target, key, receiver)) return Reflect.set(hypeDocument.customData, key, val);
-					return Reflect.set(target, key, val, receiver);
-				},
-				get(target, key, receiver) {
-					var value = Reflect.get(target, key, receiver);
-					if (value) return value;
-					return Reflect.get(hypeDocument.customData, key);
-				},
-				has(target, key, receiver) {
-					if (!target.hasOwnProperty(key) && !window[key]) return true;
-					return Reflect.has(target, key, receiver)
-				},
+	function runCode(code, hypeDocument, scope, HypeActionEventOptions) {
+		if (scope){
+			if (typeof scope !== 'object') return null;
+		} else {
+			scope = hypeDocument.customData;
+		}
+		
+		if ("HypeActionEvents" in window !== false) {
+			HypeActionEventOptions = HypeActionEventOptions || {};		
+			return hypeDocument.triggerAction (code, { 
+				element: HypeActionEventOptions.element, 
+				event: { type: HypeActionEventOptions.type},
+				scope: scope,
 			});
-			return new Function('$context', 'with($context){ ' + code + '}')($context);
-		} catch (e) {
-			console.error(e)
+			
+		} else {
+			
+			
+			try {
+				let $context = new Proxy(Object.assign({}, hypeDocument), {
+					set (target, key, val, receiver) {
+						if (!Reflect.get(target, key, receiver)) return Reflect.set(scope, key, val);
+						return Reflect.set(target, key, val, receiver);
+					},
+					get(target, key, receiver) {
+						var value = Reflect.get(target, key, receiver);
+						if (value) return value;
+						return Reflect.get(scope, key);
+					},
+					has(target, key, receiver) {
+						if (!target.hasOwnProperty(key) && !window[key]) return true;
+						return Reflect.has(target, key, receiver)
+					},
+				});
+				return new Function('$context', 'with($context){ ' + code + '}')($context);
+			} catch (e) {
+				console.error(e)
+			}	
 		}
 	}
 	
 	function isCode(code){
 		return /[;=()]/.test(code);
+	}
+	
+	function resolveScope(hypeDocument, element, scope) {
+		if (scope) {
+			return runCode('return '+scope, hypeDocument, null, {
+				element: element, 
+				type: 'HypeReactiveScope',
+			});
+		}
+		return null;
+	}
+
+	function resolveClosestScope(hypeDocument, element) {
+		let closestElm = element.closest('[data-scope]');
+		if (closestElm) return resolveScope(hypeDocument, element, closestElm.getAttribute('data-scope'));
+		return null;
 	}
 	
 	/**
@@ -181,36 +229,57 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			if (key!==undefined && value!==undefined && !isCode(value)) {
 				hypeDocument.triggerCustomBehaviorNamed(key + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
 			}
+			
 			if (key!==undefined) {
 				if (getDefault('customDataUpdate')) getDefault('customDataUpdate')(key, value);
 				hypeDocument.triggerCustomBehaviorNamed('customData was changed');
 				hypeDocument.triggerCustomBehaviorNamed(key + ' was updated');
 			}
+			
 			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
+			
 			sceneElm.querySelectorAll('[data-content], [data-visibility]').forEach(function(elm){
 				let content = elm.getAttribute('data-content');
 				let visibility = elm.getAttribute('data-visibility');
-				if ("HypeActionEvents" in window === false) {
-					if (content) {
-						let contentReturn = runCode('return '+content, hypeDocument);
-						elm.innerHTML =  contentReturn!==undefined? contentReturn : '';
+				let scopeContent = null;
+				let scopeVisibility = null;
+				let scopeSymbolLength = getDefault('scopeSymbolLength');
+				
+				if (content) {
+					content = content.trim();
+					if (content.startsWith(getDefault('scopeSymbol'))) {
+						content = content.slice(scopeSymbolLength);
+						scopeContent = resolveClosestScope(hypeDocument, elm);
+					} else if (content.includes(getDefault('scopeSymbol'))) {
+						scopeContent = content.slice(0, content.indexOf(getDefault('scopeSymbol')));
+						scopeContent = resolveScope(hypeDocument, elm, scopeContent);
+						content = content.slice(content.indexOf(getDefault('scopeSymbol')) + scopeSymbolLength);
 					}
-					if (visibility) {
-						let visibilityReturn = runCode('return '+visibility, hypeDocument);
-						if (elm.style.display == 'none') elm.style.display = 'block';
-						elm.style.visibility = visibilityReturn? 'visible': 'hidden';
-					}
-				} else {
-					if (content) {
-						let contentReturn = hypeDocument.triggerAction ('return '+content, { element: elm, event: {type:'HypeReactiveContent'}});
-						elm.innerHTML = contentReturn!==undefined? contentReturn : '';
-					}
-					if (visibility) {
-						let visibilityReturn = hypeDocument.triggerAction ('return '+visibility, { element: elm, event: {type:'HypeReactiveVisibility'}});
-						if (elm.style.display == 'none') elm.style.display = 'block';
-						elm.style.visibility = visibilityReturn? 'visible': 'hidden';
-					}
+					let contentReturn = runCode('return '+content, hypeDocument, scopeContent, {
+						element: elm, 
+						type: 'HypeReactiveContent',
+					});
+					elm.innerHTML =  contentReturn!==undefined? contentReturn : '';
 				}
+				
+				if (visibility) {
+					visibility = visibility.trim();
+					if (visibility.startsWith(getDefault('scopeSymbol'))) {
+						visibility = visibility.slice(scopeSymbolLength);
+						scopeVisibility = scopeContent;
+					} else if (visibility.includes(getDefault('scopeSymbol'))) {
+						scopeVisibility = visibility.slice(0, visibility.indexOf(getDefault('scopeSymbol')));
+						scopeVisibility = resolveScope(hypeDocument, elm, scopeVisibility)
+						visibility = visibility.slice(visibility.indexOf(getDefault('scopeSymbol')) + scopeSymbolLength);
+					}
+					let visibilityReturn = runCode('return '+visibility, hypeDocument, scopeVisibility, {
+						element: elm, 
+						type: 'HypeReactiveVisibility',
+					});
+					if (elm.style.display == 'none') elm.style.display = 'block';
+					elm.style.visibility = visibilityReturn? 'visible': 'hidden';
+				}
+			
 			})
 			
 			if ("HypeDataMagic" in window !== false) {
@@ -246,9 +315,51 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	if ("HypeActionEvents" in window === false) {
 		window.HYPE_eventListeners.push({ "type": "HypeTriggerCustomBehavior", "callback": HypeTriggerCustomBehavior });
 	}
-		
+	
+	if(_isHypeIDE){
+		window.addEventListener("DOMContentLoaded", function(event) {
+			if (getDefault('highlightReactiveContent')){
+				
+				let labelBase = "font-family:Helvetica,Arial;line-height:11px;font-size:9px;font-weight:normal;padding:2px 5px;white-space:nowrap;max-height:16px;color:#000;text-align:center;background-color:var(--color);";
+				let labelTop = "position:absolute;top:-15px;left:-1px;border-top-right-radius:.2rem;border-top-left-radius:.2rem;";
+				let labelBottom = "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem"
+				let colorScoped = '#ffcccc';
+				let colorContent = '#f8d54f';
+				let rules = [];
+				
+				if (getDefault('highlightContentData')) rules = rules.concat([
+					"[data-content*='"+getDefault('scopeSymbol')+"']{--color:"+colorScoped+";}",
+					"[data-content]{--color:#f8d54f;outline:1px solid "+colorContent+";position:relative}",
+					"[data-content]::before{content:attr(data-content);"+labelBase+labelTop+"}",
+				]);
+					
+				if (getDefault('highlightVisibilityData')) rules = rules.concat([	
+					"[data-visibility*='"+getDefault('scopeSymbol')+"']{--color:"+colorScoped+";}",
+					"[data-visibility]{--color:"+colorContent+";}",
+					"[data-visibility]::before{content:'"+getDefault('visibilitySymbol')+" ' attr(data-visibility);"+labelBase+labelTop+"}",
+				]);
+					
+				if (getDefault('highlightScopeData')) rules = rules.concat([	
+					"[data-scope]{--color:"+colorScoped+"; outline:1px dashed var(--color);}",				
+					"[data-scope]::before{content:attr(data-scope);"+labelBase+labelBottom+"}",
+				]);
+				
+				if (getDefault('highlightContentData') && getDefault('highlightVisibilityData')) rules = rules.concat([	
+					"[data-content][data-visibility]::before{content: attr(data-content) ' "+getDefault('visibilitySymbol')+" ' attr(data-visibility)}",
+				]);
+				
+				//if (getDefault('highlightVisibilityArea')) 
+				rules = rules.concat([	
+					"[data-visibility]::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--color) 10px,var(--color) 20px);opacity: .25;}",
+				]);
+					
+				rules.forEach((rule)=> document.styleSheets[0].insertRule(rule,0));
+			}
+		});
+	}
+	
 	return {
-		version: '1.1.0',
+		version: '1.1.1',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
