@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.1.2
+Hype Reactive Content 1.1.3
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -23,6 +23,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added data-scope and scope indicator at beginning of expressions with the arrow symbol (⇢)
 *       Added the ability to inline the scope in data-content before the arrow symbol (⇢)
 * 1.1.2 Minor cleanups and fixes
+* 1.1.3 Fixed another falsy type bug that forwarded undefined data-scopes to the default scope
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -161,6 +162,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		if (scope){
 			if (typeof scope !== 'object') return null;
 		} else {
+			if (scope === undefined) return null;
 			scope = hypeDocument.customData;
 		}
 		
@@ -173,7 +175,6 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			});
 			
 		} else {
-			
 			
 			try {
 				let $context = new Proxy(Object.assign({}, hypeDocument), {
@@ -303,7 +304,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		if ("HypeActionEvents" in window !== false) return;
 		var code = event.customBehaviorName;
 		if (code.charAt(0) == '#') return;
-		if (isCode(code)) runCode(code, hypeDocument);
+		if (isCode(code)) runCode(code, hypeDocument, hypeDocument.customData);
 	}
 	
 	function HypeScenePrepareForDisplay(hypeDocument, element, event) {
@@ -359,7 +360,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	return {
-		version: '1.1.2',
+		version: '1.1.3',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
