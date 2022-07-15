@@ -20,8 +20,8 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 		Added setDefault and getDefault, added customDataUpdate (callback) as default possibility
 * 1.1.0 Added hypeDocument.enableReactiveCustomData and the default customData
 * 1.1.1 Fixed null case and added reactive highlighting in IDE
-*       Added data-scope and scope indicator at beginning of expressions with the package emoji
-*       Added the ability to inline the scope in data-content before the package emoji
+*       Added data-scope and scope indicator at beginning of expressions with the arrow symbol
+*       Added the ability to inline the scope in data-content before the arrow symbol
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
