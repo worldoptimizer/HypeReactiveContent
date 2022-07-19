@@ -32,13 +32,18 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
 
 	_default = {
-		highlightReactiveContent: true,
-		highlightVisibilityData: true,
-		highlightVisibilityArea: true,
-		highlightContentData: true,
-		highlightScopeData: true,
 		scopeSymbol: '⇢',
 		visibilitySymbol: '👁',
+	}
+	
+	if (_isHypeIDE) {
+		_default = Object.assign(_default, {
+			highlightReactiveContent: true,
+			highlightVisibilityData: true,
+			highlightVisibilityArea: true,
+			highlightContentData: true,
+			highlightScopeData: true,
+		})
 	}
 
 	/**
