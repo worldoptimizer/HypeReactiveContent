@@ -24,7 +24,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added the ability to inline the scope in data-content before the arrow symbol (⇢)
 * 1.1.2 Minor cleanups and fixes
 * 1.1.3 Fixed another falsy type bug that forwarded undefined data-scopes to the default scope
-* 1.1.4 Added support for arbitrary scopeSymbols with arbitrary length, default is still ⇢
+* 1.1.4 Added support for an arbitrary scopeSymbol with arbitrary length, default is still ⇢
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
