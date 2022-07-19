@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.1.3
+Hype Reactive Content 1.1.4
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -24,6 +24,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added the ability to inline the scope in data-content before the arrow symbol (⇢)
 * 1.1.2 Minor cleanups and fixes
 * 1.1.3 Fixed another falsy type bug that forwarded undefined data-scopes to the default scope
+* 1.1.4 Added support for arbitrary scopeSymbols with arbitrary length, default is still ⇢
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -37,7 +38,6 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		highlightContentData: true,
 		highlightScopeData: true,
 		scopeSymbol: '⇢',
-		scopeSymbolLength: 1,
 		visibilitySymbol: '👁',
 	}
 
@@ -245,7 +245,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 				let visibility = elm.getAttribute('data-visibility');
 				let scopeContent = null;
 				let scopeVisibility = null;
-				let scopeSymbolLength = getDefault('scopeSymbolLength');
+				let scopeSymbolLength = getDefault('scopeSymbol').length;
 				
 				if (content) {
 					content = content.trim();
@@ -360,7 +360,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	return {
-		version: '1.1.3',
+		version: '1.1.4',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
