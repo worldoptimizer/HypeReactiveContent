@@ -243,14 +243,12 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		hypeDocument.refreshReactiveContent = function(key, value, target, receiver) {
 			if (key!==undefined && value!==undefined && !isCode(value)) {
 				hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
-				console.log(fullKey(receiver._key, key))
 			}
 			
 			if (key!==undefined) {
 				if (getDefault('customDataUpdate')) getDefault('customDataUpdate')(key, value, target, receiver);
 				hypeDocument.triggerCustomBehaviorNamed('customData was changed');
 				hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' was updated');
-				console.log(fullKey(receiver._key, key)+ ' was updated')
 			}
 			
 			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
