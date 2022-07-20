@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.1.4
+Hype Reactive Content 1.1.5
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -24,7 +24,9 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added the ability to inline the scope in data-content before the arrow symbol (⇢)
 * 1.1.2 Minor cleanups and fixes
 * 1.1.3 Fixed another falsy type bug that forwarded undefined data-scopes to the default scope
-* 1.1.4 Added support for an arbitrary scopeSymbol with arbitrary length, default is still ⇢
+* 1.1.4 Added support for arbitrary scopeSymbols with arbitrary length, default is still ⇢
+* 1.1.5 Added the _key getter in the proxy to return a simple object string path
+*       This fixes custom behavior notifications for nested keys as a full pseudo key is returned
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -88,7 +90,11 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 
 	function isReactive(obj) {
 		return obj[isProxy];
-	};
+	}
+	
+	function fullKey(_key, key){
+		return _key? _key+'.'+key : key;
+	}
 	
 	/**
 	 * This function makes an object reactive and fires a callback on set operations
@@ -97,14 +103,16 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 * @param {Function} callback This is function that should be called
 	 * @return Returns the object as a proxy
 	 */
-	function enableReactiveObject(obj, callback) {
+	function enableReactiveObject(obj, callback, _key) {
+		_key = _key || '';
 		if (obj == null || isReactive(obj)) return obj;
 		const handler = {
 			get: function(target, key, receiver) {
+				if (key === '_key') return _key;
 				if (key === isProxy) return true;
 				const result = Reflect.get(target, key, receiver);
 				if (typeof result === 'object') {
-					return enableReactiveObject(result, callback);
+					return enableReactiveObject(result, callback, fullKey(_key, key));
 				}
 				return result;
 			},
@@ -234,13 +242,15 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		
 		hypeDocument.refreshReactiveContent = function(key, value, target, receiver) {
 			if (key!==undefined && value!==undefined && !isCode(value)) {
-				hypeDocument.triggerCustomBehaviorNamed(key + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
+				hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
+				console.log(fullKey(receiver._key, key))
 			}
 			
 			if (key!==undefined) {
 				if (getDefault('customDataUpdate')) getDefault('customDataUpdate')(key, value, target, receiver);
 				hypeDocument.triggerCustomBehaviorNamed('customData was changed');
-				hypeDocument.triggerCustomBehaviorNamed(key + ' was updated');
+				hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' was updated');
+				console.log(fullKey(receiver._key, key)+ ' was updated')
 			}
 			
 			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
@@ -365,7 +375,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	return {
-		version: '1.1.4',
+		version: '1.1.5',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
