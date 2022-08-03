@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.1.5
+Hype Reactive Content 1.1.6
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -27,10 +27,13 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.1.4 Added support for arbitrary scopeSymbols with arbitrary length, default is still ⇢
 * 1.1.5 Added the _key getter in the proxy to return a simple object string path
 *       This fixes custom behavior notifications for nested keys as a full pseudo key is returned
+* 1.1.6 Added bubble type listener for action and behavior as data-content-changed-action, 
+*       data-content-changed-behavior, data-visibility-changed-action and data-visibility-changed-behavior.
+*       Added $elm and element to code execution even if not used in conjunction with Hype Action Events
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
-	/* @const */
+	/* @const */ 
 	const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
 
 	_default = {
@@ -171,7 +174,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 * @param {string} code JavaScript to run
 	 * @param {HYPE.documents.API} hypeDocument for context
 	 */
-	function runCode(code, hypeDocument, scope, HypeActionEventOptions) {
+	function runCode(code, hypeDocument, scope, options) {
 		if (scope){
 			if (typeof scope !== 'object') return null;
 		} else {
@@ -179,18 +182,23 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			scope = hypeDocument.customData;
 		}
 		
+		options = options || {};
+		
 		if ("HypeActionEvents" in window !== false) {
-			HypeActionEventOptions = HypeActionEventOptions || {};		
 			return hypeDocument.triggerAction (code, { 
-				element: HypeActionEventOptions.element, 
-				event: { type: HypeActionEventOptions.type},
+				element: options.element, 
+				event: { type: options.type},
 				scope: scope,
 			});
 			
 		} else {
 			
+						
 			try {
-				let $context = new Proxy(Object.assign({}, hypeDocument), {
+				let $context = new Proxy(Object.assign({
+					element: options.element,
+					$elm: options.element,
+				}, hypeDocument), {
 					set (target, key, val, receiver) {
 						if (!Reflect.get(target, key, receiver)) return Reflect.set(scope, key, val);
 						return Reflect.set(target, key, val, receiver);
@@ -206,6 +214,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 					},
 				});
 				return new Function('$context', 'with($context){ ' + code + '}')($context);
+				
 			} catch (e) {
 				console.error(e)
 			}	
@@ -240,6 +249,25 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 */
 	function HypeDocumentLoad(hypeDocument, element, event) {
 		
+		let behaviorCallbacks = {}
+		function behaviorActionHelper(elm, type, datasetKey, action, behavior){
+			let bubbleElm = elm.closest('['+datasetKey+'-action]');
+			if (bubbleElm){
+				runCode(bubbleElm.getAttribute(datasetKey+'-action'), hypeDocument, null, {
+					element: elm, 
+					type: type,
+				})
+			}
+			bubbleElm = elm.closest('['+datasetKey+'-behavior]');
+			if (bubbleElm && !behaviorCallbacks[bubbleElm.id]){
+				behaviorCallbacks[bubbleElm.id] = true;
+				let behavior = bubbleElm.getAttribute(datasetKey+'-behavior');
+				debounceByRequestFrame(function(){
+					hypeDocument.triggerCustomBehaviorNamed(behavior);
+				})();
+			}
+		}
+		
 		hypeDocument.refreshReactiveContent = function(key, value, target, receiver) {
 			if (key!==undefined && value!==undefined && !isCode(value)) {
 				hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
@@ -252,6 +280,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			}
 			
 			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
+			behaviorCallbacks = {}
 			
 			sceneElm.querySelectorAll('[data-content], [data-visibility]').forEach(function(elm){
 				let content = elm.getAttribute('data-content');
@@ -274,7 +303,11 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 						element: elm, 
 						type: 'HypeReactiveContent',
 					});
-					elm.innerHTML =  contentReturn!==undefined? contentReturn : '';
+					contentReturn = contentReturn!==undefined? contentReturn : '';
+					if (contentReturn!==elm.innerHTML){
+						elm.innerHTML = contentReturn;
+						if (key) behaviorActionHelper(elm, 'HypeReactiveContentChanged', 'data-content-changed', true, true);
+					}
 				}
 				
 				if (visibility) {
@@ -292,7 +325,13 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 						type: 'HypeReactiveVisibility',
 					});
 					if (elm.style.display == 'none') elm.style.display = 'block';
-					elm.style.visibility = visibilityReturn? 'visible': 'hidden';
+					let newVisibility = visibilityReturn? 'visible': 'hidden';
+					if (newVisibility!==elm.style.visibility){
+						elm.style.visibility = newVisibility;
+						if (key) behaviorActionHelper(elm, 'HypeReactiveVisibiltyChanged', 'data-visibility-changed', true, true);
+					}
+					
+					
 				}
 			
 			})
@@ -373,7 +412,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	return {
-		version: '1.1.5',
+		version: '1.1.6',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
