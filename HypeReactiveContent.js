@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.1.6
+Hype Reactive Content 1.1.7
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -30,6 +30,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.1.6 Added bubble type listener for action and behavior as data-content-changed-action, 
 *       data-content-changed-behavior, data-visibility-changed-action and data-visibility-changed-behavior.
 *       Added $elm and element to code execution even if not used in conjunction with Hype Action Events
+* 1.1.7 Exposed resolveClosestScope to hypeDocument
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -342,6 +343,10 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		}
 		hypeDocument.refreshReactiveContentDebounced = debounceByRequestFrame(hypeDocument.refreshReactiveContent);
 		
+		hypeDocument.resolveClosestScope = function(elm){
+			return resolveClosestScope(hypeDocument, elm);
+		}
+		
 		hypeDocument.enableReactiveCustomData = function(data){
 			hypeDocument.customData = Object.assign(hypeDocument.customData, data || {});
 			hypeDocument.customData = enableReactiveObject(hypeDocument.customData, hypeDocument.refreshReactiveContentDebounced);	
@@ -412,7 +417,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	return {
-		version: '1.1.6',
+		version: '1.1.7',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
