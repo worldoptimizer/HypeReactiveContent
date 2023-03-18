@@ -60,10 +60,10 @@ A: In general, the content automatically refreshes when you change a value. It u
 | `data-content`      | Sets the content of an element based on the custom data property. Supports data scoping with the `⇢` symbol.                                              |
 | `data-visibility`   | Controls the visibility of an element based on the custom data property. Supports data scoping with the `⇢` symbol.                                        |
 | `data-scope`        | Defines the data scope for an element.                                                                                                                     |
-| `data-content-changed-action` | Triggers a custom action when the content is changed.                                                                                                    |
-| `data-content-changed-behavior` | Triggers a custom behavior when the content is changed.                                                                                                 |
-| `data-visibility-changed-action` | Triggers a custom action when the visibility is changed.                                                                                                |
-| `data-visibility-changed-behavior` | Triggers a custom behavior when the visibility is changed.                                                                                             |
+| `data-content-changed-action` | Triggers a custom action when the content is changed. <sup>1</sup>                                                                                                    |
+| `data-content-changed-behavior` | Triggers a custom behavior when the content is changed. <sup>1</sup>                                                                                                 |
+| `data-visibility-changed-action` | Triggers a custom action when the visibility is changed. <sup>1</sup>                                                                                               |
+| `data-visibility-changed-behavior` | Triggers a custom behavior when the visibility is changed. <sup>1</sup>                                                                                            |
 
 
 ## Extended hypeDocument API
@@ -88,3 +88,9 @@ These commands are part of the Hype Reactive Content Library and are accessible 
 | `enableReactiveObject(obj, callback, _key)` | Makes an object reactive and fires a callback on set operations. Returns the object as a proxy.                                               |
 | `disableReactiveObject(obj)`    | Makes an object non-reactive. Returns the object as a non-reactive object.                                                                     |
 | `debounceByRequestFrame(fn)`    | Debounces a function by requestAnimationFrame. Returns the debounced function.          
+
+
+
+---
+
+<sup>(1) When using Hype Reactive Content, changes made to child elements with data-content or data-visibility attributes will propagate upwards in the DOM, triggering any custom behavior or action specified in the corresponding data-content-changed-behavior, data-visibility-changed-behavior, data-content-changed-action, or data-visibility-changed-action attributes. This means that if a child element's content or visibility changes, any parent elements with these custom attributes will be updated accordingly.</sup>
