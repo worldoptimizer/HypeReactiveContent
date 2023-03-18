@@ -79,15 +79,15 @@ These commands are part of the Hype Reactive Content Library and are accessible 
 
 
 
-## Returned API
+## HypeReactiveContent API
 
 | Function                        | Description                                                                                                                                    |
 |---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| `setDefault(key, value)`        | Allows overriding a global default by key or if an object is given as key to override all default at once.                                     |
-| `getDefault(key)`               | Returns the value of a default by key or all default if no key is given.                                                                       |
-| `enableReactiveObject(obj, callback, _key)` | Makes an object reactive and fires a callback on set operations. Returns the object as a proxy.                                               |
-| `disableReactiveObject(obj)`    | Makes an object non-reactive. Returns the object as a non-reactive object.                                                                     |
-| `debounceByRequestFrame(fn)`    | Debounces a function by requestAnimationFrame. Returns the debounced function.          
+| `HypeReactiveContent.setDefault(key, value)`        | Allows overriding a global default by key or if an object is given as key to override all default at once.                                     |
+| `HypeReactiveContent.getDefault(key)`               | Returns the value of a default by key or all default if no key is given.                                                                       |
+| `HypeReactiveContent.enableReactiveObject(obj, callback, _key)` | Makes an object reactive and fires a callback on set operations. Returns the object as a proxy.                                               |
+| `HypeReactiveContent.disableReactiveObject(obj)`    | Makes an object non-reactive. Returns the object as a non-reactive object.                                                                     |
+| `HypeReactiveContent.debounceByRequestFrame(fn)`    | Debounces a function by requestAnimationFrame. Returns the debounced function.          
 
 
 
