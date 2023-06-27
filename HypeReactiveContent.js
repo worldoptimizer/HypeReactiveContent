@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.1.7
+Hype Reactive Content 1.1.8
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -31,6 +31,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       data-content-changed-behavior, data-visibility-changed-action and data-visibility-changed-behavior.
 *       Added $elm and element to code execution even if not used in conjunction with Hype Action Events
 * 1.1.7 Exposed resolveClosestScope to hypeDocument
+* 1.1.8 Updated visibility handling in conjunction with scope in content processing
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -315,7 +316,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 					visibility = visibility.trim();
 					if (visibility.startsWith(getDefault('scopeSymbol'))) {
 						visibility = visibility.slice(scopeSymbolLength);
-						scopeVisibility = scopeContent;
+						scopeVisibility = scopeContent || resolveClosestScope(hypeDocument, elm);
 					} else if (visibility.includes(getDefault('scopeSymbol'))) {
 						scopeVisibility = visibility.slice(0, visibility.indexOf(getDefault('scopeSymbol')));
 						scopeVisibility = resolveScope(hypeDocument, elm, scopeVisibility)
@@ -417,7 +418,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	return {
-		version: '1.1.7',
+		version: '1.1.8',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
