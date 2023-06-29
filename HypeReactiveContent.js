@@ -32,7 +32,10 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added $elm and element to code execution even if not used in conjunction with Hype Action Events
 * 1.1.7 Exposed resolveClosestScope to hypeDocument
 * 1.1.8 Updated visibility handling in conjunction with scope in content processing
-* 1.1.9 Fixed a slight regression. 
+* 1.1.9 Added processValueInScope to streamline the code 
+*       Added data-effect to trigger code on reactive content changes
+*       Fixed a slight regression in the visibility handling
+*       Reworked the IDE highlighting to be more robust and include effect
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -51,6 +54,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			highlightVisibilityArea: true,
 			highlightContentData: true,
 			highlightScopeData: true,
+			highlightEffectData: true,
 		})
 	}
 
@@ -195,8 +199,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			});
 			
 		} else {
-			
-						
+					
 			try {
 				let $context = new Proxy(Object.assign({
 					element: options.element,
@@ -243,7 +246,29 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		if (closestElm) return resolveScope(hypeDocument, element, closestElm.getAttribute('data-scope'));
 		return null;
 	}
-	
+
+	function processValueInScope(value, hypeDocument, elm) {
+		const scopeSymbol = getDefault('scopeSymbol');
+		const scopeSymbolLength = scopeSymbol.length;
+		let scope = null;
+
+		value = value.trim();
+
+		if (value.startsWith(scopeSymbol)) {
+			value = value.slice(scopeSymbolLength);
+			scope = resolveClosestScope(hypeDocument, elm);
+		} else if (value.includes(scopeSymbol)) {
+			scope = value.slice(0, value.indexOf(scopeSymbol));
+			scope = resolveScope(hypeDocument, elm, scope);
+			value = value.slice(value.indexOf(scopeSymbol) + scopeSymbolLength);
+		}
+
+		return {
+			value: value,
+			scope: scope
+		};
+	}
+	  
 	/**
 	 * @function HypeDocumentLoad
 	 * @param {object} hypeDocument - the hypeDocument
@@ -285,56 +310,46 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
 			behaviorCallbacks = {}
 			
-			sceneElm.querySelectorAll('[data-content], [data-visibility]').forEach(function(elm){
+			sceneElm.querySelectorAll('[data-visibility], [data-content], [data-effect]').forEach(function(elm){
 				let content = elm.getAttribute('data-content');
 				let visibility = elm.getAttribute('data-visibility');
-				let scopeContent = null;
-				let scopeVisibility = null;
-				let scopeSymbolLength = getDefault('scopeSymbol').length;
-				
-				if (content) {
-					content = content.trim();
-					if (content.startsWith(getDefault('scopeSymbol'))) {
-						content = content.slice(scopeSymbolLength);
-						scopeContent = resolveClosestScope(hypeDocument, elm);
-					} else if (content.includes(getDefault('scopeSymbol'))) {
-						scopeContent = content.slice(0, content.indexOf(getDefault('scopeSymbol')));
-						scopeContent = resolveScope(hypeDocument, elm, scopeContent);
-						content = content.slice(content.indexOf(getDefault('scopeSymbol')) + scopeSymbolLength);
-					}
-					let contentReturn = runCode('return '+content, hypeDocument, scopeContent, {
-						element: elm, 
-						type: 'HypeReactiveContent',
-					});
-					contentReturn = contentReturn!==undefined? contentReturn : '';
-					if (contentReturn!==elm.innerHTML){
-						elm.innerHTML = contentReturn;
-						if (key) behaviorActionHelper(elm, 'HypeReactiveContentChanged', 'data-content-changed', true, true);
-					}
-				}
-				
+				let effect = elm.getAttribute('data-effect');
+
 				if (visibility) {
-					visibility = visibility.trim();
-					if (visibility.startsWith(getDefault('scopeSymbol'))) {
-						visibility = visibility.slice(scopeSymbolLength);
-						scopeVisibility = resolveClosestScope(hypeDocument, elm);
-					} else if (visibility.includes(getDefault('scopeSymbol'))) {
-						scopeVisibility = visibility.slice(0, visibility.indexOf(getDefault('scopeSymbol')));
-						scopeVisibility = resolveScope(hypeDocument, elm, scopeVisibility)
-						visibility = visibility.slice(visibility.indexOf(getDefault('scopeSymbol')) + scopeSymbolLength);
-					}
-					let visibilityReturn = runCode('return '+visibility, hypeDocument, scopeVisibility, {
+					const processed = processValueInScope(visibility, hypeDocument, elm);
+					let result = runCode('return '+processed.value, hypeDocument, processed.scope, {
 						element: elm, 
 						type: 'HypeReactiveVisibility',
 					});
+
 					if (elm.style.display == 'none') elm.style.display = 'block';
-					let newVisibility = visibilityReturn? 'visible': 'hidden';
+					let newVisibility = result? 'visible': 'hidden';
 					if (newVisibility!==elm.style.visibility){
 						elm.style.visibility = newVisibility;
 						if (key) behaviorActionHelper(elm, 'HypeReactiveVisibiltyChanged', 'data-visibility-changed', true, true);
 					}
-					
-					
+				}
+
+				if (effect) {
+					const processed = processValueInScope(effect, hypeDocument, elm);
+					runCode(processed.value, hypeDocument, processed.scope, {
+						element: elm,
+						type: 'HypeReactiveEffect',
+					});
+				}
+			
+				if (content) {
+					const processed = processValueInScope(content, hypeDocument, elm);
+					let result = runCode('return '+processed.value, hypeDocument, processed.scope, {
+						element: elm, 
+						type: 'HypeReactiveContent',
+					});
+
+					result = result!==undefined? result : '';
+					if (result!==elm.innerHTML){
+						elm.innerHTML = result;
+						if (key) behaviorActionHelper(elm, 'HypeReactiveContentChanged', 'data-content-changed', true, true);
+					}
 				}
 			
 			})
@@ -378,42 +393,44 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	if(_isHypeIDE){
+		function capitalize(string) {
+			return string.charAt(0).toUpperCase() + string.slice(1);
+		}
 		window.addEventListener("DOMContentLoaded", function(event) {
 			if (getDefault('highlightReactiveContent')){
 				
-				let labelBase = "font-family:Helvetica,Arial;line-height:11px;font-size:9px;font-weight:normal;padding:2px 5px;white-space:nowrap;max-height:16px;color:#000;text-align:center;background-color:var(--color);";
-				let labelTop = "position:absolute;top:-15px;left:-1px;border-top-right-radius:.2rem;border-top-left-radius:.2rem;";
-				let labelBottom = "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem"
-				let colorScoped = '#ffcccc';
-				let colorContent = '#f8d54f';
+				const cssBase = {
+					label: "font-family:Helvetica,Arial;line-height:11px;font-size:9px;font-weight:normal;padding:2px 5px;white-space:nowrap;max-height:16px;color:#000;text-align:center;background-color:var(--color);",
+					labelTop: "position:absolute;top:-15px;left:-1px;border-top-right-radius:.2rem;border-top-left-radius:.2rem;",
+					labelBottom: "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem",
+				};
+				const colors = {
+					scoped: '#ffcccc',
+					content: '#f8d54f'
+				};
+				const types = ['content', 'visibility', 'scope', 'effect'];
 				let rules = [];
 				
-				if (getDefault('highlightContentData')) rules = rules.concat([
-					"[data-content*='"+getDefault('scopeSymbol')+"']{--color:"+colorScoped+";}",
-					"[data-content]{--color:#f8d54f;outline:1px solid "+colorContent+";position:relative}",
-					"[data-content]::before{content:attr(data-content);"+labelBase+labelTop+"}",
-				]);
-					
-				if (getDefault('highlightVisibilityData')) rules = rules.concat([	
-					"[data-visibility*='"+getDefault('scopeSymbol')+"']{--color:"+colorScoped+";}",
-					"[data-visibility]{--color:"+colorContent+";}",
-					"[data-visibility]::before{content:'"+getDefault('visibilitySymbol')+" ' attr(data-visibility);"+labelBase+labelTop+"}",
-				]);
-					
-				if (getDefault('highlightScopeData')) rules = rules.concat([	
-					"[data-scope]{--color:"+colorScoped+"; outline:1px dashed var(--color);}",				
-					"[data-scope]::before{content:attr(data-scope);"+labelBase+labelBottom+"}",
-				]);
+				types.forEach(function(type) {
+					if(getDefault("highlight" + capitalize(type) + "Data")) {
+						rules.push("[data-" + type + "*='" + getDefault('scopeSymbol') + "']{--color:" + colors.scoped + " !important;}");
+						rules.push("[data-" + type + "]{--color:" + colors.content + ";outline:1px dotted var(--color);position:relative}");
+						if (type === 'scope') {
+							rules.push("[data-" + type + "]::before{content:attr(data-" + type + ");" + cssBase.label + cssBase.labelBottom + "}");
+						} else {
+							rules.push("[data-" + type + "]::before{content:attr(data-" + type + ");" + cssBase.label + cssBase.labelTop + "}");
+							rules.push("[data-" + type + "][data-visibility]::before{content: attr(data-" + type + ") ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}");
+						}
+					}
+				});
+	
+				if(getDefault('highlightVisibilityArea')) {
+					rules.push("[data-visibility]::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--color) 10px,var(--color) 20px);opacity: .1;}");
+				}
 				
-				if (getDefault('highlightContentData') && getDefault('highlightVisibilityData')) rules = rules.concat([	
-					"[data-content][data-visibility]::before{content: attr(data-content) ' "+getDefault('visibilitySymbol')+" ' attr(data-visibility)}",
-				]);
-				
-				if (getDefault('highlightVisibilityArea')) rules = rules.concat([	
-					"[data-visibility]::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--color) 10px,var(--color) 20px);opacity: .1;}",
-				]);
-					
-				rules.forEach((rule)=> document.styleSheets[0].insertRule(rule,0));
+				rules.forEach(function(rule) {
+					document.styleSheets[0].insertRule(rule,0);
+				});
 			}
 		});
 	}
