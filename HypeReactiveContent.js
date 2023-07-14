@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.1.9
+Hype Reactive Content 1.2.0
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -36,6 +36,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added data-effect to trigger code on reactive content changes
 *       Fixed a slight regression in the visibility handling
 *       Reworked the IDE highlighting to be more robust and include effect
+* 1.2.0 Fixed minor regressions in highlighting in the IDE
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -44,7 +45,8 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 
 	_default = {
 		scopeSymbol: '⇢',
-		visibilitySymbol: '👁',
+		visibilitySymbol: '☀️',
+		effectSymbol: '⚡️',
 	}
 	
 	if (_isHypeIDE) {
@@ -52,9 +54,8 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			highlightReactiveContent: true,
 			highlightVisibilityData: true,
 			highlightVisibilityArea: true,
-			highlightContentData: true,
+			highlightActionData: true,
 			highlightScopeData: true,
-			highlightEffectData: true,
 		})
 	}
 
@@ -393,50 +394,49 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 	
 	if(_isHypeIDE){
-		function capitalize(string) {
-			return string.charAt(0).toUpperCase() + string.slice(1);
-		}
 		window.addEventListener("DOMContentLoaded", function(event) {
 			if (getDefault('highlightReactiveContent')){
-				
-				const cssBase = {
-					label: "font-family:Helvetica,Arial;line-height:11px;font-size:9px;font-weight:normal;padding:2px 5px;white-space:nowrap;max-height:16px;color:#000;text-align:center;background-color:var(--color);",
-					labelTop: "position:absolute;top:-15px;left:-1px;border-top-right-radius:.2rem;border-top-left-radius:.2rem;",
-					labelBottom: "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem",
-				};
-				const colors = {
-					scoped: '#ffcccc',
-					content: '#f8d54f'
-				};
-				const types = ['content', 'visibility', 'scope', 'effect'];
+
+				let labelBase = "font-family:Helvetica,Arial;line-height:11px;font-size:9px;font-weight:normal;padding:2px 5px;white-space:nowrap;max-height:16px;color:#000;text-align:center;background-color:var(--data-reactive-color);";
+				let labelTop = "position:absolute;top:-15px;left:-1px;border-top-right-radius:.2rem;border-top-left-radius:.2rem;";
+				let labelBottom = "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem"
+				let colorScoped = '#ffcccc';
+				let colorContent = '#f8d54f';
 				let rules = [];
-				
-				types.forEach(function(type) {
-					if(getDefault("highlight" + capitalize(type) + "Data")) {
-						rules.push("[data-" + type + "*='" + getDefault('scopeSymbol') + "']{--color:" + colors.scoped + " !important;}");
-						rules.push("[data-" + type + "]{--color:" + colors.content + ";outline:1px dotted var(--color);position:relative}");
-						if (type === 'scope') {
-							rules.push("[data-" + type + "]::before{content:attr(data-" + type + ");" + cssBase.label + cssBase.labelBottom + "}");
-						} else {
-							rules.push("[data-" + type + "]::before{content:attr(data-" + type + ");" + cssBase.label + cssBase.labelTop + "}");
-							rules.push("[data-" + type + "][data-visibility]::before{content: attr(data-" + type + ") ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}");
-						}
-					}
-				});
-	
-				if(getDefault('highlightVisibilityArea')) {
-					rules.push("[data-visibility]::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--color) 10px,var(--color) 20px);opacity: .1;}");
-				}
-				
-				rules.forEach(function(rule) {
-					document.styleSheets[0].insertRule(rule,0);
-				});
+			
+				document.documentElement.style.setProperty('--data-reactive-color', colorContent);
+
+				if (getDefault('highlightActionData')) rules = rules.concat([
+					"[data-content]{outline:1px dashed var(--data-reactive-color);position:relative}",
+					"[data-content]::before{content:attr(data-content);"+labelBase+labelTop+"}",
+					"[data-effect]::before{content:attr(data-effect);"+labelBase+labelTop+"}",
+				]);
+
+				if (getDefault('highlightVisibilityData')) rules = rules.concat([	
+					"[data-visibility]::before{content:'"+getDefault('visibilitySymbol')+" ' attr(data-visibility);"+labelBase+labelTop+"}",
+				]);
+
+				if (getDefault('highlightScopeData')) rules = rules.concat([	
+					"[data-scope]{--data-reactive-color:"+colorScoped+"; outline:1px dashed var(--data-reactive-color);}",				
+					"[data-scope]::after{content:attr(data-scope);"+labelBase+labelBottom+"}",
+				]);
+
+				if (getDefault('highlightActionData') && getDefault('highlightVisibilityData')) rules = rules.concat([	
+					"[data-content][data-visibility]:not([data-effect])::before{content: attr(data-content) ' "+getDefault('visibilitySymbol')+" ' attr(data-visibility)}",
+					"[data-content][data-visibility]::before{content: attr(data-content)  ' "+getDefault('effectSymbol')+" ' attr(data-effect) ' "+getDefault('visibilitySymbol')+" ' attr(data-visibility)}",
+				]);
+
+				if (getDefault('highlightVisibilityArea')) rules = rules.concat([	
+					"[data-visibility]:not([data-scope])::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--data-reactive-color) 10px,var(--data-reactive-color) 20px);opacity: .1;}",
+				]);
+			
+				rules.forEach((rule)=> document.styleSheets[0].insertRule(rule,0));
 			}
 		});
 	}
-	
+
 	return {
-		version: '1.1.9',
+		version: '1.2.0',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
