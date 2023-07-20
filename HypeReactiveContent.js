@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.2.0
+Hype Reactive Content 1.2.1
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -37,6 +37,8 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Fixed a slight regression in the visibility handling
 *       Reworked the IDE highlighting to be more robust and include effect
 * 1.2.0 Fixed minor regressions in highlighting in the IDE
+* 1.2.1 Added hypeDocument.customDataUpdate on Hype document basis
+*       Fixed minor misses in the IDE highlighting for effect
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -45,7 +47,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 
 	_default = {
 		scopeSymbol: '⇢',
-		visibilitySymbol: '☀️',
+		visibilitySymbol: '👁️',
 		effectSymbol: '⚡️',
 	}
 	
@@ -304,6 +306,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			
 			if (key!==undefined) {
 				if (getDefault('customDataUpdate')) getDefault('customDataUpdate')(key, value, target, receiver);
+				if (hypeDocument.customDataUpdate) hypeDocument.customDataUpdate(key, value, target, receiver);
 				hypeDocument.triggerCustomBehaviorNamed('customData was changed');
 				hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' was updated');
 			}
@@ -409,7 +412,8 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 				if (getDefault('highlightActionData')) rules = rules.concat([
 					"[data-content]{outline:1px dashed var(--data-reactive-color);position:relative}",
 					"[data-content]::before{content:attr(data-content);"+labelBase+labelTop+"}",
-					"[data-effect]::before{content:attr(data-effect);"+labelBase+labelTop+"}",
+					"[data-effect]::before{content:'"+getDefault('effectSymbol')+" ' attr(data-effect);"+labelBase+labelTop+"}",
+					"[data-content][data-effect]::before{content: attr(data-content) ' "+getDefault('effectSymbol')+" ' attr(data-effect)}",
 				]);
 
 				if (getDefault('highlightVisibilityData')) rules = rules.concat([	
@@ -423,7 +427,9 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 
 				if (getDefault('highlightActionData') && getDefault('highlightVisibilityData')) rules = rules.concat([	
 					"[data-content][data-visibility]:not([data-effect])::before{content: attr(data-content) ' "+getDefault('visibilitySymbol')+" ' attr(data-visibility)}",
-					"[data-content][data-visibility]::before{content: attr(data-content)  ' "+getDefault('effectSymbol')+" ' attr(data-effect) ' "+getDefault('visibilitySymbol')+" ' attr(data-visibility)}",
+					"[data-effect][data-visibility]:not([data-content])::before{content: ' "+getDefault('effectSymbol')+" ' attr(data-effect) ' "+getDefault('visibilitySymbol')+" ' attr(data-visibility)}",
+					"[data-content][data-effect][data-visibility]::before{content: attr(data-content)  ' "+getDefault('effectSymbol')+" ' attr(data-effect) ' "+getDefault('visibilitySymbol')+" ' attr(data-visibility)}",
+
 				]);
 
 				if (getDefault('highlightVisibilityArea')) rules = rules.concat([	
@@ -436,7 +442,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 
 	return {
-		version: '1.2.0',
+		version: '1.2.1',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
