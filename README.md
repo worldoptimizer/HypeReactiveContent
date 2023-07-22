@@ -51,6 +51,17 @@ A: Yes, the Hype Reactive Content Library is designed to work seamlessly with ot
 
 A: In general, the content automatically refreshes when you change a value. It uses a debounce approach and if you need to update immediately you can use `hypeDocument.refreshReactiveContent` function, which updates the content and visibility of your elements based on the custom data properties.
 
+**Q: How do I use the `data-effect` attribute in my elements?**
+
+A: To use the `data-effect` attribute, simply add it to your HTML elements and assign it a value that is a valid JavaScript code. This code will be run dynamically and can interact with the custom data properties.
+
+**Q: What kind of effects can I create with the `data-effect` attribute?**
+
+A: The `data-effect` attribute allows dynamic JavaScript code execution, which means you can create a wide range of effects such as changing color, size, position or any other property based on some data change.
+
+**Q: How do I update the effect of my elements when a custom data property changes?**
+
+A: The `data-effect` attribute is reactive, so any changes in the custom data property will automatically trigger the code in the `data-effect` attribute, updating the effect accordingly.
 
 
 ## Data Attributes
@@ -64,7 +75,7 @@ A: In general, the content automatically refreshes when you change a value. It u
 | `data-content-changed-behavior` | Triggers a custom behavior when the content is changed. <sup>1</sup>                                                                                                 |
 | `data-visibility-changed-action` | Triggers a custom action when the visibility is changed. <sup>1</sup>                                                                                               |
 | `data-visibility-changed-behavior` | Triggers a custom behavior when the visibility is changed. <sup>1</sup>                                                                                            |
-
+| `data-effect`      | Controls the behavior or animation of an element based on the custom data property. Supports data scoping with the `⇢` symbol and allows dynamic JavaScript code execution. |
 
 ## Extended hypeDocument API
 
