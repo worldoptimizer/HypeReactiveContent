@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.2.1
+Hype Reactive Content 1.2.2
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -39,6 +39,7 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.2.0 Fixed minor regressions in highlighting in the IDE
 * 1.2.1 Added hypeDocument.customDataUpdate on Hype document basis
 *       Fixed minor misses in the IDE highlighting for effect
+* 1.2.2 Tweaked color highlighting in the IDE to color unscoped items in scopes correctly
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
@@ -405,7 +406,15 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 				let labelBottom = "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem"
 				let colorScoped = '#ffcccc';
 				let colorContent = '#f8d54f';
-				let rules = [];
+				let rules = [
+					"[data-scope] [data-content*="+getDefault('scopeSymbol')+"],"+
+					"[data-scope] [data-effect*="+getDefault('scopeSymbol')+"],"+
+					"[data-scope] [data-visibility*="+getDefault('scopeSymbol')+"]"+
+					"{--data-reactive-color: "+colorScoped+"}",
+					
+					"[data-content], [data-effect], [data-visibility]"+
+					"{--data-reactive-color: "+colorContent+"}"
+				];
 			
 				document.documentElement.style.setProperty('--data-reactive-color', colorContent);
 
@@ -442,7 +451,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 
 	return {
-		version: '1.2.1',
+		version: '1.2.2',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
