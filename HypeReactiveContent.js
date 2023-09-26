@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.2.2
+Hype Reactive Content 1.3.0
 copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -40,16 +40,19 @@ copyright (c) 2022 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.2.1 Added hypeDocument.customDataUpdate on Hype document basis
 *       Fixed minor misses in the IDE highlighting for effect
 * 1.2.2 Tweaked color highlighting in the IDE to color unscoped items in scopes correctly
+* 1.3.0 Added WeakMap setter for hypeDocument.customData to automatically apply reactivity on reassignments
 */
 if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
 	/* @const */ 
 	const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
+	const customDataMap = new WeakMap();
 
 	_default = {
 		scopeSymbol: '⇢',
 		visibilitySymbol: '👁️',
 		effectSymbol: '⚡️',
+		debounceCustomDataUpdate: true,
 	}
 	
 	if (_isHypeIDE) {
@@ -203,7 +206,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			});
 			
 		} else {
-					
+		
 			try {
 				let $context = new Proxy(Object.assign({
 					element: options.element,
@@ -272,7 +275,32 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 			scope: scope
 		};
 	}
-	  
+	
+	/**
+	 * Function to setup the customData proxy on the hypeDocument
+	 * 
+	 * @param {HYPE.documents.API} hypeDocument - the hypeDocument
+	 */
+	function setupCustomDataProxy(hypeDocument) {
+		let currentCustomData = hypeDocument.customData || {};
+		customDataMap.set(hypeDocument, currentCustomData);
+	
+		Object.defineProperty(hypeDocument, 'customData', {
+			get: function() {
+				return customDataMap.get(hypeDocument);
+			},
+			set: function(newValue) {
+				const reactiveData = enableReactiveObject(newValue, hypeDocument.refreshReactiveContentDebounced);
+				customDataMap.set(hypeDocument, reactiveData);
+				if(getDefault('debounceCustomDataUpdate')) {
+					hypeDocument.refreshReactiveContentDebounced();
+				} else {
+					hypeDocument.refreshReactiveContent();
+				}
+			}
+		});
+	}
+ 
 	/**
 	 * @function HypeDocumentLoad
 	 * @param {object} hypeDocument - the hypeDocument
@@ -280,6 +308,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	 * @param {object} event - the event
 	 */
 	function HypeDocumentLoad(hypeDocument, element, event) {
+		
 		
 		let behaviorCallbacks = {}
 		function behaviorActionHelper(elm, type, datasetKey, action, behavior){
@@ -370,10 +399,12 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 		}
 		
 		hypeDocument.enableReactiveCustomData = function(data){
-			hypeDocument.customData = Object.assign(hypeDocument.customData, data || {});
-			hypeDocument.customData = enableReactiveObject(hypeDocument.customData, hypeDocument.refreshReactiveContentDebounced);	
+			const existingData = customDataMap.get(hypeDocument) || {};
+			hypeDocument.customData = Object.assign(existingData, data || {});
 		}
 		
+		setupCustomDataProxy(hypeDocument);
+
 		hypeDocument.enableReactiveCustomData(getDefault('customData') || {})
 		
 		if (hypeDocument.functions().HypeReactiveContent) hypeDocument.functions().HypeReactiveContent(hypeDocument, element, event);
@@ -451,7 +482,7 @@ if("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (f
 	}
 
 	return {
-		version: '1.2.2',
+		version: '1.3.0',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
