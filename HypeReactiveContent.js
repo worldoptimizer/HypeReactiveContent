@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.4.0
+Hype Reactive Content 1.4.1
 copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -45,6 +45,7 @@ copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added new functions: setContentTemplateByName, setContentTemplates, flushContentTemplateByName, flushContentTemplates        
 *       Added visibility modes: auto (new default), manual and none
 *       Added better error handling in runCode when in preview mode
+* 1.4.1 Fixed feature regression by removing debouncing in HypeScenePrepareForDisplay 
 */
 
 if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
@@ -57,9 +58,9 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 		scopeSymbol: '⇢',
 		visibilitySymbol: '👁️',
 		effectSymbol: '⚡️',
-        templateSymbol: '📝',
+		templateSymbol: '📝',
 		debounceCustomDataUpdate: true,
-        visibilityMode: 'auto',
+		visibilityMode: 'auto',
 		debug: false,
 	}
 	
@@ -70,7 +71,7 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 			highlightVisibilityArea: true,
 			highlightActionData: true,
 			highlightScopeData: true,
-            highlightTemplateData: true,
+			highlightTemplateData: true,
 		})
 	}
 
@@ -309,54 +310,54 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 	}
 
 	/** 
-     * Helper to parse templates using runCode for evaluation
-     * 
-     * @param {string} template - the template to parse
-     * @param {HYPE.documents.API} hypeDocument - the hypeDocument
-     * @param {HTMLElement} elm - the element
-     * @returns {string} - the parsed template
-     */
-    function parseTemplate(template, hypeDocument, elm) {
-        return template.replace(/{{\s*([^{}\s]+)\s*}}/g, function (match, expression) {
-            const processed = processValueInScope(expression, hypeDocument, elm);
-            let result = runCode('return ' + processed.value, hypeDocument, processed.scope, {
-                element: elm,
-                type: 'HypeReactiveTemplate',
-            });
-            return result !== undefined ? result : '';
-        });
-    }
-    
+	 * Helper to parse templates using runCode for evaluation
+	 * 
+	 * @param {string} template - the template to parse
+	 * @param {HYPE.documents.API} hypeDocument - the hypeDocument
+	 * @param {HTMLElement} elm - the element
+	 * @returns {string} - the parsed template
+	 */
+	function parseTemplate(template, hypeDocument, elm) {
+		return template.replace(/{{\s*([^{}\s]+)\s*}}/g, function (match, expression) {
+			const processed = processValueInScope(expression, hypeDocument, elm);
+			let result = runCode('return ' + processed.value, hypeDocument, processed.scope, {
+				element: elm,
+				type: 'HypeReactiveTemplate',
+			});
+			return result !== undefined ? result : '';
+		});
+	}
+	
 
-    /*
-     * Template Cache
-     * @const {WeakMap} templateCache - the template cache
-    */
+	/*
+	 * Template Cache
+	 * @const {WeakMap} templateCache - the template cache
+	*/
 	const templateCache = new WeakMap();
 
-    /**
-     * @function initTemplates
-     * @param {HYPE.documents.API} hypeDocument - the hypeDocument
-     * @returns {Map} - the document templates
-     */
-    function initTemplates(hypeDocument) {
-        let sceneElm = document.getElementById(hypeDocument.currentSceneId());
-        let documentTemplates = templateCache.get(hypeDocument) || new Map();
-        
-        sceneElm.querySelectorAll('[data-content-template]').forEach(function (elm) {
-            const templateName = elm.getAttribute('data-content-template');
-            const templateContent = elm.innerHTML;
-    
-            if (templateName && !documentTemplates.has(templateName)) {
-                documentTemplates.set(templateName, templateContent);
-            } else if (!templateName && !documentTemplates.has(elm)) {
-                documentTemplates.set(elm, templateContent);
-            }
-        });
-    
-        templateCache.set(hypeDocument, documentTemplates);
-    }
-    
+	/**
+	 * @function initTemplates
+	 * @param {HYPE.documents.API} hypeDocument - the hypeDocument
+	 * @returns {Map} - the document templates
+	 */
+	function initTemplates(hypeDocument) {
+		let sceneElm = document.getElementById(hypeDocument.currentSceneId());
+		let documentTemplates = templateCache.get(hypeDocument) || new Map();
+		
+		sceneElm.querySelectorAll('[data-content-template]').forEach(function (elm) {
+			const templateName = elm.getAttribute('data-content-template');
+			const templateContent = elm.innerHTML;
+	
+			if (templateName && !documentTemplates.has(templateName)) {
+				documentTemplates.set(templateName, templateContent);
+			} else if (!templateName && !documentTemplates.has(elm)) {
+				documentTemplates.set(elm, templateContent);
+			}
+		});
+	
+		templateCache.set(hypeDocument, documentTemplates);
+	}
+	
 
 	/**
 	 * @function setupCustomDataProxy
@@ -410,83 +411,83 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 		}
 		
 		hypeDocument.refreshReactiveContent = function (key, value, target, receiver) {
-            if (key !== undefined && value !== undefined && !isCode(value)) {
-                hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
-            }
-        
-            if (key !== undefined) {
-                if (getDefault('customDataUpdate')) getDefault('customDataUpdate')(key, value, target, receiver);
-                if (hypeDocument.customDataUpdate) hypeDocument.customDataUpdate(key, value, target, receiver);
-                hypeDocument.triggerCustomBehaviorNamed('customData was changed');
-                hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' was updated');
-            }
-        
-            let sceneElm = document.getElementById(hypeDocument.currentSceneId());
-            behaviorCallbacks = {};
-        
-            sceneElm.querySelectorAll('[data-visibility], [data-content], [data-effect], [data-content-template]').forEach(function (elm) {
-                let content = elm.getAttribute('data-content');
-                let visibility = elm.getAttribute('data-visibility');
-                let effect = elm.getAttribute('data-effect');
-                let hasTemplate = elm.hasAttribute('data-content-template');
-        
-                if (visibility) {
-                    const processed = processValueInScope(visibility, hypeDocument, elm);
-                    let result = runCode('return ' + processed.value, hypeDocument, processed.scope, {
-                        element: elm,
-                        type: 'HypeReactiveVisibility',
-                    });
-        
-                    if (elm.style.display == 'none') elm.style.display = 'block';
-                    let newVisibility = result ? 'visible' : 'hidden';
-                    if (newVisibility !== elm.style.visibility) {
-                        elm.style.visibility = newVisibility;
-                        if (key) behaviorActionHelper(elm, 'HypeReactiveVisibilityChanged', 'data-visibility-changed', true, true);
-                    }
-                }
-        
-                if (effect) {
-                    const processed = processValueInScope(effect, hypeDocument, elm);
-                    runCode(processed.value, hypeDocument, processed.scope, {
-                        element: elm,
-                        type: 'HypeReactiveEffect',
-                    });
-                }
-        
-                if (content) {
-                    const processed = processValueInScope(content, hypeDocument, elm);
-                    let result = runCode('return ' + processed.value, hypeDocument, processed.scope, {
-                        element: elm,
-                        type: 'HypeReactiveContent',
-                    });
-        
-                    result = result !== undefined ? result : '';
-                    if (result !== elm.innerHTML) {
-                        elm.innerHTML = result;
-                        if (key) behaviorActionHelper(elm, 'HypeReactiveContentChanged', 'data-content-changed', true, true);
-                    }
-                } else if (hasTemplate) {
-                    let templateName = elm.getAttribute('data-content-template');
-                    const documentTemplates = templateCache.get(hypeDocument) || new Map();
-                    let templateContent = templateName ? documentTemplates.get(templateName) : documentTemplates.get(elm);
-        
-                    if (templateContent) {
-                        const renderedTemplate = parseTemplate(templateContent, hypeDocument, elm);
-                        if (renderedTemplate !== elm.innerHTML) {
-                            elm.innerHTML = renderedTemplate;
-                            if (key) behaviorActionHelper(elm, 'HypeReactiveTemplateChanged', 'data-content-template-changed', true, true);
-                        }
-                    } else {
-                        elm.innerHTML = '';
-                    }
-                }
-            });
-        
-            if ("HypeDataMagic" in window !== false) {
-                if (HypeDataMagic.getDefault('refreshOnCustomData')) hypeDocument.refresh();
-            }
-        }        
-        
+			if (key !== undefined && value !== undefined && !isCode(value)) {
+				hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
+			}
+		
+			if (key !== undefined) {
+				if (getDefault('customDataUpdate')) getDefault('customDataUpdate')(key, value, target, receiver);
+				if (hypeDocument.customDataUpdate) hypeDocument.customDataUpdate(key, value, target, receiver);
+				hypeDocument.triggerCustomBehaviorNamed('customData was changed');
+				hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' was updated');
+			}
+		
+			let sceneElm = document.getElementById(hypeDocument.currentSceneId());
+			behaviorCallbacks = {};
+		
+			sceneElm.querySelectorAll('[data-visibility], [data-content], [data-effect], [data-content-template]').forEach(function (elm) {
+				let content = elm.getAttribute('data-content');
+				let visibility = elm.getAttribute('data-visibility');
+				let effect = elm.getAttribute('data-effect');
+				let hasTemplate = elm.hasAttribute('data-content-template');
+		
+				if (visibility) {
+					const processed = processValueInScope(visibility, hypeDocument, elm);
+					let result = runCode('return ' + processed.value, hypeDocument, processed.scope, {
+						element: elm,
+						type: 'HypeReactiveVisibility',
+					});
+		
+					if (elm.style.display == 'none') elm.style.display = 'block';
+					let newVisibility = result ? 'visible' : 'hidden';
+					if (newVisibility !== elm.style.visibility) {
+						elm.style.visibility = newVisibility;
+						if (key) behaviorActionHelper(elm, 'HypeReactiveVisibilityChanged', 'data-visibility-changed', true, true);
+					}
+				}
+		
+				if (effect) {
+					const processed = processValueInScope(effect, hypeDocument, elm);
+					runCode(processed.value, hypeDocument, processed.scope, {
+						element: elm,
+						type: 'HypeReactiveEffect',
+					});
+				}
+		
+				if (content) {
+					const processed = processValueInScope(content, hypeDocument, elm);
+					let result = runCode('return ' + processed.value, hypeDocument, processed.scope, {
+						element: elm,
+						type: 'HypeReactiveContent',
+					});
+		
+					result = result !== undefined ? result : '';
+					if (result !== elm.innerHTML) {
+						elm.innerHTML = result;
+						if (key) behaviorActionHelper(elm, 'HypeReactiveContentChanged', 'data-content-changed', true, true);
+					}
+				} else if (hasTemplate) {
+					let templateName = elm.getAttribute('data-content-template');
+					const documentTemplates = templateCache.get(hypeDocument) || new Map();
+					let templateContent = templateName ? documentTemplates.get(templateName) : documentTemplates.get(elm);
+		
+					if (templateContent) {
+						const renderedTemplate = parseTemplate(templateContent, hypeDocument, elm);
+						if (renderedTemplate !== elm.innerHTML) {
+							elm.innerHTML = renderedTemplate;
+							if (key) behaviorActionHelper(elm, 'HypeReactiveTemplateChanged', 'data-content-template-changed', true, true);
+						}
+					} else {
+						elm.innerHTML = '';
+					}
+				}
+			});
+		
+			if ("HypeDataMagic" in window !== false) {
+				if (HypeDataMagic.getDefault('refreshOnCustomData')) hypeDocument.refresh();
+			}
+		}        
+		
 
 		hypeDocument.refreshReactiveContentDebounced = debounceByRequestFrame(hypeDocument.refreshReactiveContent);
 		
@@ -499,41 +500,41 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 			hypeDocument.customData = Object.assign(existingData, data || {});
 		}
 
-        hypeDocument.setContentTemplateByName = function(templateName, templateContent, forceRefresh = true) {
-            let documentTemplates = templateCache.get(hypeDocument) || new Map();
-            documentTemplates.set(templateName, templateContent);
-            templateCache.set(hypeDocument, documentTemplates);
-            if (forceRefresh) hypeDocument.refreshReactiveContentDebounced();
-        }
-        
-        hypeDocument.setContentTemplates = function(templates, forceRefresh = true) {
-            if (templates && typeof templates === 'object') {
-                for (let templateName in templates) {
-                    if (templates.hasOwnProperty(templateName)) {
-                        hypeDocument.setContentTemplateByName(templateName, templates[templateName], false);
-                    }
-                }
-                if (forceRefresh) hypeDocument.refreshReactiveContentDebounced();
-            }
-        }
-        
-        hypeDocument.flushContentTemplateByName = function(templateName, forceRefresh = true) {
-            const documentTemplates = templateCache.get(hypeDocument);
-            if (documentTemplates && templateName) {
-                documentTemplates.delete(templateName);
-                templateCache.set(hypeDocument, documentTemplates);
-                if (forceRefresh) hypeDocument.refreshReactiveContentDebounced();
-            }
-        }
-        
-        hypeDocument.flushContentTemplates = function(forceRefresh = true) {
-            const documentTemplates = templateCache.get(hypeDocument);
-            if (documentTemplates) {
-                documentTemplates.clear();
-                templateCache.set(hypeDocument, documentTemplates);
-                if (forceRefresh) hypeDocument.refreshReactiveContentDebounced();
-            }
-        }        
+		hypeDocument.setContentTemplateByName = function(templateName, templateContent, forceRefresh = true) {
+			let documentTemplates = templateCache.get(hypeDocument) || new Map();
+			documentTemplates.set(templateName, templateContent);
+			templateCache.set(hypeDocument, documentTemplates);
+			if (forceRefresh) hypeDocument.refreshReactiveContentDebounced();
+		}
+		
+		hypeDocument.setContentTemplates = function(templates, forceRefresh = true) {
+			if (templates && typeof templates === 'object') {
+				for (let templateName in templates) {
+					if (templates.hasOwnProperty(templateName)) {
+						hypeDocument.setContentTemplateByName(templateName, templates[templateName], false);
+					}
+				}
+				if (forceRefresh) hypeDocument.refreshReactiveContentDebounced();
+			}
+		}
+		
+		hypeDocument.flushContentTemplateByName = function(templateName, forceRefresh = true) {
+			const documentTemplates = templateCache.get(hypeDocument);
+			if (documentTemplates && templateName) {
+				documentTemplates.delete(templateName);
+				templateCache.set(hypeDocument, documentTemplates);
+				if (forceRefresh) hypeDocument.refreshReactiveContentDebounced();
+			}
+		}
+		
+		hypeDocument.flushContentTemplates = function(forceRefresh = true) {
+			const documentTemplates = templateCache.get(hypeDocument);
+			if (documentTemplates) {
+				documentTemplates.clear();
+				templateCache.set(hypeDocument, documentTemplates);
+				if (forceRefresh) hypeDocument.refreshReactiveContentDebounced();
+			}
+		}        
 
 		setupCustomDataProxy(hypeDocument);
 
@@ -551,14 +552,14 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 	
 	function HypeScenePrepareForDisplay(hypeDocument, element, event) {
 		initTemplates(hypeDocument);
-        hypeDocument.refreshReactiveContentDebounced();
+		hypeDocument.refreshReactiveContent();
 	}
 
 	if ("HYPE_eventListeners" in window === false) { window.HYPE_eventListeners = Array(); }
 	window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 	window.HYPE_eventListeners.push({ type: "HypeScenePrepareForDisplay", callback: HypeScenePrepareForDisplay });
 	
-    if ("HypeActionEvents" in window === false) {
+	if ("HypeActionEvents" in window === false) {
 		window.HYPE_eventListeners.push({ "type": "HypeTriggerCustomBehavior", "callback": HypeTriggerCustomBehavior });
 	}
 	
@@ -590,10 +591,10 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 					"[data-content][data-effect]::before{content: attr(data-content) ' " + getDefault('effectSymbol') + " ' attr(data-effect)}",
 				]);
 
-                if (getDefault('highlightTemplateData')) rules = rules.concat([ 
-                    "[data-content-template]{outline:1px dashed var(--data-reactive-color);position:relative}",
-                    "[data-content-template]::before{content:'" + getDefault('templateSymbol') + " ' attr(data-content-template);" + labelBase + labelTop + "}",
-                ]);
+				if (getDefault('highlightTemplateData')) rules = rules.concat([ 
+					"[data-content-template]{outline:1px dashed var(--data-reactive-color);position:relative}",
+					"[data-content-template]::before{content:'" + getDefault('templateSymbol') + " ' attr(data-content-template);" + labelBase + labelTop + "}",
+				]);
 
 				if (getDefault('highlightVisibilityData')) rules = rules.concat([	
 					"[data-visibility]::before{content:'" + getDefault('visibilitySymbol') + " ' attr(data-visibility);" + labelBase + labelTop + "}",
@@ -619,35 +620,35 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 			}
 		});   
 	} else {
-        window.addEventListener("DOMContentLoaded", function (event) {
-            let visibilityMode = getDefault('visibilityMode');
-            let rules = [];
-    
-            switch (visibilityMode) {
-                case 'auto':
-                    rules.push(
-                        "[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
-                    );
-                    break;
+		window.addEventListener("DOMContentLoaded", function (event) {
+			let visibilityMode = getDefault('visibilityMode');
+			let rules = [];
+	
+			switch (visibilityMode) {
+				case 'auto':
+					rules.push(
+						"[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
+					);
+					break;
 
-                case 'manual':
-                    rules.push(
-                        "[style*=\"visibility: hidden\"] .inheritVisibility { visibility: hidden !important; }",
-                        ".propagateVisibility[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
-                    );
-                    break;
+				case 'manual':
+					rules.push(
+						"[style*=\"visibility: hidden\"] .inheritVisibility { visibility: hidden !important; }",
+						".propagateVisibility[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
+					);
+					break;
 
-                case 'none':
-                default:
-                    break;
-            }
-    
-            rules.forEach((rule) => document.styleSheets[0].insertRule(rule, 0));
-        });
-    }
-    
+				case 'none':
+				default:
+					break;
+			}
+	
+			rules.forEach((rule) => document.styleSheets[0].insertRule(rule, 0));
+		});
+	}
+	
 	return {
-		version: '1.4.0',
+		version: '1.4.1',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
