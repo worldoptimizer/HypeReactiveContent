@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.5
+Hype Reactive Content 1.5.0
 copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
