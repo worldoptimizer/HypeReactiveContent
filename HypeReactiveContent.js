@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.5.0
+Hype Reactive Content 1.5.1
 copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -49,6 +49,8 @@ copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.5.0 Added proper HTML comparison using normalized DOM nodes
 *       Added support for explicitly returning null to skip content updates
 *       Added customizable redraw tracking functionality to visualize reactive updates
+* 1.5.1 Moved redraw overlay styling to class-based approach and gated by isHypePreview
+*       Added support for returning HTMLElement and DocumentFragment in content expressions
 */
 
 if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
@@ -87,7 +89,7 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 	
 	// Improved highlightRedraw function with consistent timing
 	function highlightRedraw(element) {
-		if (!getDefault('trackRedraws')) return;
+		if (!getDefault('trackRedraws') || !isHypePreview()) return;
 		
 		// Use requestAnimationFrame to wait for the next paint cycle
 		requestAnimationFrame(() => {
@@ -103,10 +105,6 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 			overlay.style.position = 'absolute';
 			overlay.style.pointerEvents = 'none';
 			overlay.style.zIndex = '9999';
-			overlay.style.boxSizing = 'border-box';
-			overlay.style.backgroundColor = getDefault('redrawOverlayColor');
-			overlay.style.border = `${getDefault('redrawBorderWidth')} solid ${getDefault('redrawBorderColor')}`;
-			
 			overlay.style.top = (window.scrollY + rect.top) + 'px';
 			overlay.style.left = (window.scrollX + rect.left) + 'px';
 			overlay.style.width = rect.width + 'px';
@@ -510,22 +508,29 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 					});
 					
 					// Skip update if null is explicitly returned
-					if (result === null) return;
-					
-					result = result !== undefined ? result : '';
-					
-					// Create normalized version once
-					const tempDiv = document.createElement('div');
-					tempDiv.innerHTML = result;
-					const normalizedHTML = tempDiv.innerHTML;
-					
-					// Use normalized version for comparison and update
-					if (normalizedHTML !== elm.innerHTML) {
-						elm.innerHTML = normalizedHTML;
-						highlightRedraw(elm); 
-						if (key) behaviorActionHelper(elm, 'HypeReactiveContentChanged', 'data-content-changed', true, true);
+					if (result !== null) {
+						// Handle HTML elements, fragments, or strings
+						const tempDiv = document.createElement('div');
+						const isNodeResult = result instanceof HTMLElement || result instanceof DocumentFragment;
 						
+						if (isNodeResult) {
+							tempDiv.appendChild(result.cloneNode(true));
+						} else {
+							result = result !== undefined ? result : '';
+							tempDiv.innerHTML = result;
+						}
 						
+						const normalizedNew = tempDiv.innerHTML;
+						if (normalizedNew !== elm.innerHTML) {
+							if (isNodeResult) {
+								elm.innerHTML = '';
+								elm.appendChild(result);
+							} else {
+								elm.innerHTML = normalizedNew;
+							}
+							highlightRedraw(elm); 
+							if (key) behaviorActionHelper(elm, 'HypeReactiveContentChanged', 'data-content-changed', true, true);
+						}
 					}
 				} else if (hasTemplate) {
 					let templateName = elm.getAttribute('data-content-template');
@@ -693,6 +698,17 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 			let visibilityMode = getDefault('visibilityMode');
 			let rules = [];
 	
+			// Add redraw overlay styles only in high preview mode
+			if (isHypePreview()) {
+				rules.push(
+					".hype-reactive-redraw-overlay {" +
+					"box-sizing: border-box;" +
+					"background-color: rgba(255, 0, 0, 0.2);" +
+					"border: 1px solid rgba(255, 0, 0, 0.5);" +
+					"}"
+				);
+			}
+
 			switch (visibilityMode) {
 				case 'auto':
 					rules.push(
@@ -717,7 +733,7 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 	}
 	
 	return {
-		version: '1.5',
+		version: '1.5.1',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
