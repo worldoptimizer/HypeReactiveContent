@@ -1,6 +1,6 @@
 /*!
 Hype Reactive Content 1.5.1
-copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
+copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
 * Version-History
