@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.4.1
+Hype Reactive Content 1.5
 copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -45,7 +45,10 @@ copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added new functions: setContentTemplateByName, setContentTemplates, flushContentTemplateByName, flushContentTemplates        
 *       Added visibility modes: auto (new default), manual and none
 *       Added better error handling in runCode when in preview mode
-* 1.4.1 Fixed feature regression by removing debouncing in HypeScenePrepareForDisplay 
+* 1.4.1 Fixed feature regression by removing debouncing in HypeScenePrepareForDisplay
+* 1.5.0 Added proper HTML comparison using normalized DOM nodes
+*       Added support for explicitly returning null to skip content updates
+*       Added customizable redraw tracking functionality to visualize reactive updates
 */
 
 if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
@@ -62,6 +65,12 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 		debounceCustomDataUpdate: true,
 		visibilityMode: 'auto',
 		debug: false,
+
+   	 	trackRedraws: false,
+		redrawHighlightDuration: 250,
+		redrawOverlayColor: 'rgba(255, 0, 0, 0.2)',
+		redrawBorderColor: 'rgba(255, 0, 0, 0.5)',
+		redrawBorderWidth: '1px'
 	}
 	
 	if (_isHypeIDE) {
@@ -74,7 +83,46 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 			highlightTemplateData: true,
 		})
 	}
-
+	
+	
+	// Improved highlightRedraw function with consistent timing
+	function highlightRedraw(element) {
+		if (!getDefault('trackRedraws')) return;
+		
+		// Use requestAnimationFrame to wait for the next paint cycle
+		requestAnimationFrame(() => {
+			// Element might no longer be in DOM by this time
+			if (!element.isConnected) return;
+			
+			const rect = element.getBoundingClientRect();
+			// Skip if element has no dimensions
+			if (rect.width === 0 && rect.height === 0) return;
+			
+			const overlay = document.createElement('div');
+			overlay.className = 'hype-reactive-redraw-overlay';
+			overlay.style.position = 'absolute';
+			overlay.style.pointerEvents = 'none';
+			overlay.style.zIndex = '9999';
+			overlay.style.boxSizing = 'border-box';
+			overlay.style.backgroundColor = getDefault('redrawOverlayColor');
+			overlay.style.border = `${getDefault('redrawBorderWidth')} solid ${getDefault('redrawBorderColor')}`;
+			
+			overlay.style.top = (window.scrollY + rect.top) + 'px';
+			overlay.style.left = (window.scrollX + rect.left) + 'px';
+			overlay.style.width = rect.width + 'px';
+			overlay.style.height = rect.height + 'px';
+			
+			document.body.appendChild(overlay);
+			
+			setTimeout(() => {
+				if (overlay && overlay.parentNode) {
+					overlay.parentNode.removeChild(overlay);
+				}
+			}, getDefault('redrawHighlightDuration'));
+		});
+	}
+	
+	
 	/**
 	 * This function is determins if we in a Hype Preview. 
 	 *
@@ -460,21 +508,42 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 						element: elm,
 						type: 'HypeReactiveContent',
 					});
-		
+					
+					// Skip update if null is explicitly returned
+					if (result === null) return;
+					
 					result = result !== undefined ? result : '';
-					if (result !== elm.innerHTML) {
-						elm.innerHTML = result;
+					
+					// Create normalized version once
+					const tempDiv = document.createElement('div');
+					tempDiv.innerHTML = result;
+					const normalizedHTML = tempDiv.innerHTML;
+					
+					// Use normalized version for comparison and update
+					if (normalizedHTML !== elm.innerHTML) {
+						elm.innerHTML = normalizedHTML;
+						highlightRedraw(elm); 
 						if (key) behaviorActionHelper(elm, 'HypeReactiveContentChanged', 'data-content-changed', true, true);
+						
+						
 					}
 				} else if (hasTemplate) {
 					let templateName = elm.getAttribute('data-content-template');
 					const documentTemplates = templateCache.get(hypeDocument) || new Map();
 					let templateContent = templateName ? documentTemplates.get(templateName) : documentTemplates.get(elm);
-		
+				
 					if (templateContent) {
 						const renderedTemplate = parseTemplate(templateContent, hypeDocument, elm);
-						if (renderedTemplate !== elm.innerHTML) {
-							elm.innerHTML = renderedTemplate;
+						
+						// Create normalized version once
+						const tempDiv = document.createElement('div');
+						tempDiv.innerHTML = renderedTemplate;
+						const normalizedHTML = tempDiv.innerHTML;
+						
+						// Use normalized version for comparison and update
+						if (normalizedHTML !== elm.innerHTML) {
+							elm.innerHTML = normalizedHTML;
+							highlightRedraw(elm); 
 							if (key) behaviorActionHelper(elm, 'HypeReactiveTemplateChanged', 'data-content-template-changed', true, true);
 						}
 					} else {
@@ -648,11 +717,11 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 	}
 	
 	return {
-		version: '1.4.1',
+		version: '1.5',
 		setDefault: setDefault,
 		getDefault: getDefault,
 		enableReactiveObject: enableReactiveObject,
 		disableReactiveObject: disableReactiveObject,
-		debounceByRequestFrame: debounceByRequestFrame,
+		debounceByRequestFrame: debounceByRequestFrame
 	};
 })();
