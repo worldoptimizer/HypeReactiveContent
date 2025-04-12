@@ -76,6 +76,18 @@ A: The `data-effect` attribute is reactive, so any changes in the custom data pr
 | `data-visibility-changed-action` | Triggers a custom action when the visibility is changed. <sup>1</sup>                                                                                               |
 | `data-visibility-changed-behavior` | Triggers a custom behavior when the visibility is changed. <sup>1</sup>                                                                                            |
 | `data-effect`      | Controls the behavior or animation of an element based on the custom data property. Supports data scoping with the `⇢` symbol and allows dynamic JavaScript code execution. |
+| `data-content-template` | Defines a template that can be used for dynamic content generation using {{variable}} syntax. |
+
+## Content Return Types
+
+The `data-content` attribute supports various return types:
+
+| Type | Description |
+|------|-------------|
+| String | Regular text content that will be set as innerHTML |
+| HTMLElement | A DOM element that will be directly appended to the target |
+| DocumentFragment | A document fragment that will be directly appended to the target |
+| `null` | Explicitly returning null will skip the content update |
 
 ## Extended hypeDocument API
 
@@ -85,10 +97,42 @@ A: The `data-effect` attribute is reactive, so any changes in the custom data pr
 | `hypeDocument.refreshReactiveContentDebounced()` | Debounced version of `refreshReactiveContent`. Refreshes the content and visibility of elements based on custom data properties.|
 | `hypeDocument.resolveClosestScope(elm)` | Resolves the closest data scope for the provided element.                                                                   |
 | `hypeDocument.enableReactiveCustomData(data)` | Enables reactive custom data for the Hype document, making it update automatically when custom data properties change.    |
+| `hypeDocument.setContentTemplateByName(templateName, templateContent, forceRefresh)` | Sets a named template for use with data-content-template. |
+| `hypeDocument.setContentTemplates(templates, forceRefresh)` | Sets multiple templates at once. |
+| `hypeDocument.flushContentTemplateByName(templateName, forceRefresh)` | Removes a specific template. |
+| `hypeDocument.flushContentTemplates(forceRefresh)` | Removes all templates. |
 
 These commands are part of the Hype Reactive Content Library and are accessible through the `hypeDocument` object.
 
+## Development and Debugging
 
+When working in preview mode, Hype Reactive Content provides visual feedback for content updates:
+
+- Content changes are highlighted with a brief red overlay
+- The highlight is only visible in preview mode
+- The highlight duration can be controlled via `HypeReactiveContent.setDefault('redrawHighlightDuration', milliseconds)`
+- Highlighting can be toggled via `HypeReactiveContent.setDefault('trackRedraws', boolean)`
+
+This visual feedback helps developers track when and where content updates occur in their application.
+
+## Template Support
+
+The library supports template-based content using the {{variable}} syntax:
+
+1. Define a template using `data-content-template="templateName"`
+2. Use variables in your template with `{{variableName}}`
+3. Templates can access scoped data using the arrow symbol (⇢)
+4. Templates are processed reactively, updating whenever referenced variables change
+
+Example:
+```html
+<div data-content-template="userCard">
+  <h2>{{user.name}}</h2>
+  <p>{{user.email}}</p>
+</div>
+```
+
+Templates can be managed programmatically using the template management functions in the hypeDocument API.
 
 ## HypeReactiveContent API
 
@@ -99,8 +143,6 @@ These commands are part of the Hype Reactive Content Library and are accessible 
 | `HypeReactiveContent.enableReactiveObject(obj, callback, _key)` | Makes an object reactive and fires a callback on set operations. Returns the object as a proxy.                                               |
 | `HypeReactiveContent.disableReactiveObject(obj)`    | Makes an object non-reactive. Returns the object as a non-reactive object.                                                                     |
 | `HypeReactiveContent.debounceByRequestFrame(fn)`    | Debounces a function by requestAnimationFrame. Returns the debounced function.          
-
-
 
 ---
 
