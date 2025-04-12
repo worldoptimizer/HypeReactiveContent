@@ -67,12 +67,8 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
 		debounceCustomDataUpdate: true,
 		visibilityMode: 'auto',
 		debug: false,
-
    	 	trackRedraws: false,
 		redrawHighlightDuration: 250,
-		redrawOverlayColor: 'rgba(255, 0, 0, 0.2)',
-		redrawBorderColor: 'rgba(255, 0, 0, 0.5)',
-		redrawBorderWidth: '1px'
 	}
 	
 	if (_isHypeIDE) {
