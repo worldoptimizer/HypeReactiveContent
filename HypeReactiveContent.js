@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.6.0
+Hype Reactive Content 1.6.1
 copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -53,12 +53,15 @@ copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Added support for returning HTMLElement and DocumentFragment in content expressions
 * 1.6.0 Added WeakMap cache to reuse existing proxies (fixes identity comparison)
 *       Improved template parsing to handle more edge cases
+* 1.6.1 Exposed parseTemplate to Hype Document API
+*       Sandboxed scope resolution to stay within the Hype document container
 */
 
 if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
     /* @const */ 
     const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
+    const _version = '1.6.1';
     const customDataMap = new WeakMap();
     const reactiveCache = new WeakMap();
 
@@ -329,8 +332,14 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
     }
 
     function resolveClosestScope(hypeDocument, element) {
-        let closestElm = element.closest('[data-scope]');
-        if (closestElm) return resolveScope(hypeDocument, element, closestElm.getAttribute('data-scope'));
+        if (!element) return null;
+        const closestElm = element.closest('[data-scope]');
+        if (closestElm) {
+            const documentContainer = document.getElementById(hypeDocument.documentId());
+            if (documentContainer && documentContainer.contains(closestElm)) {
+                return resolveScope(hypeDocument, element, closestElm.getAttribute('data-scope'));
+            }
+        }
         return null;
     }
 
@@ -588,6 +597,10 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
             hypeDocument.customData = Object.assign(existingData, data || {});
         }
 
+        hypeDocument.parseTemplate = function (templateString, contextElement) {
+            return parseTemplate(templateString, hypeDocument, contextElement || element);
+        }
+
         hypeDocument.setContentTemplateByName = function(templateName, templateContent, forceRefresh = true) {
             let documentTemplates = templateCache.get(hypeDocument) || new Map();
             documentTemplates.set(templateName, templateContent);
@@ -747,7 +760,7 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
     }
     
     return {
-        version: '1.6.0',
+        version:  _version,
         setDefault: setDefault,
         getDefault: getDefault,
         enableReactiveObject: enableReactiveObject,
