@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.6.1
+Hype Reactive Content 1.6.2
 copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -55,13 +55,14 @@ copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Improved template parsing to handle more edge cases
 * 1.6.1 Exposed parseTemplate to Hype Document API
 *       Sandboxed scope resolution to stay within the Hype document container
+* 1.6.2 Removed named custom behavior trigger events for object updates
 */
 
 if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
     /* @const */ 
     const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
-    const _version = '1.6.1';
+    const _version = '1.6.2';
     const customDataMap = new WeakMap();
     const reactiveCache = new WeakMap();
 
@@ -480,7 +481,7 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
         }
         
         hypeDocument.refreshReactiveContent = function (key, value, target, receiver) {
-            if (key !== undefined && value !== undefined && !isCode(value)) {
+            if (key !== undefined && value !== undefined && !isCode(value )&& typeof value !== 'object') {
                 hypeDocument.triggerCustomBehaviorNamed(fullKey(receiver._key, key) + ' equals ' + (typeof value === 'string' ? '"' + value + '"' : value));
             }
         
