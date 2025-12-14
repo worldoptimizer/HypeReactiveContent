@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.6.2
+Hype Reactive Content 1.7.1
 copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -56,13 +56,18 @@ copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
 * 1.6.1 Exposed parseTemplate to Hype Document API
 *       Sandboxed scope resolution to stay within the Hype document container
 * 1.6.2 Removed named custom behavior trigger events for object updates
+* 1.7.0 Added forceHighlightBindings default for programmatic highlight control
+*       Refactored CSS injection to use dedicated style element for easy enable/disable
+*       Exposed enableBindingHighlights and disableBindingHighlights in public API
+* 1.7.1 Fixed enableReactiveCustomData to use deep merge for nested objects
+*       This fixes intermittent issues where nested structures weren't properly merged
 */
 
 if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
     /* @const */ 
     const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
-    const _version = '1.6.2';
+    const _version = '1.7.1';
     const customDataMap = new WeakMap();
     const reactiveCache = new WeakMap();
 
@@ -76,6 +81,7 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
         debug: false,
         trackRedraws: false,
         redrawHighlightDuration: 250,
+        forceHighlightBindings: false,
     }
     
     if (_isHypeIDE) {
@@ -91,7 +97,11 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
     
     // Improved highlightRedraw function with consistent timing
     function highlightRedraw(element) {
-        if (!getDefault('trackRedraws') || !isHypePreview()) return;
+        // Allow redraw tracking if explicitly enabled OR if forceHighlightBindings is on (debug mode)
+        const allowRedraw = getDefault('trackRedraws') || getDefault('forceHighlightBindings');
+        if (!allowRedraw) return;
+        // Only require isHypePreview check if not in forced debug mode
+        if (!getDefault('forceHighlightBindings') && !isHypePreview()) return;
         
         // Use requestAnimationFrame to wait for the next paint cycle
         requestAnimationFrame(() => {
@@ -177,6 +187,26 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
     
     function fullKey(_key, key) {
         return _key ? _key + '.' + key : key;
+    }
+    
+    /**
+     * Deep merge source into target, recursively merging nested objects.
+     * Used by enableReactiveCustomData to properly merge nested structures.
+     * @param {Object} target - The target object to merge into
+     * @param {Object} source - The source object to merge from
+     */
+    function deepMergeReactive(target, source) {
+        if (!source || typeof source !== 'object') return;
+        for (const [key, value] of Object.entries(source)) {
+            const existing = target[key];
+            // If both are plain objects (not arrays, not null), recurse
+            if (existing && typeof existing === 'object' && !Array.isArray(existing) &&
+                value && typeof value === 'object' && !Array.isArray(value)) {
+                deepMergeReactive(existing, value);
+            } else {
+                target[key] = value;
+            }
+        }
     }
     
     /**
@@ -595,7 +625,10 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
         
         hypeDocument.enableReactiveCustomData = function (data) {
             const existingData = customDataMap.get(hypeDocument) || {};
-            hypeDocument.customData = Object.assign(existingData, data || {});
+            // Use deep merge to properly merge nested objects instead of shallow Object.assign
+            // This ensures nested structures are properly merged
+            deepMergeReactive(existingData, data || {});
+            hypeDocument.customData = existingData;
         }
 
         hypeDocument.parseTemplate = function (templateString, contextElement) {
@@ -665,68 +698,121 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
         window.HYPE_eventListeners.push({ "type": "HypeTriggerCustomBehavior", "callback": HypeTriggerCustomBehavior });
     }
     
+    // Binding highlight CSS injection - extracted for reuse
+    let _bindingHighlightStyleEl = null;
+    
+    function injectBindingHighlights() {
+        if (_bindingHighlightStyleEl) return; // Already injected
+        
+        let labelBase = "font-family:Helvetica,Arial;line-height:11px;font-size:9px;font-weight:normal;padding:2px 5px;white-space:nowrap;max-height:16px;color:#000;text-align:center;background-color:var(--data-reactive-color);";
+        let labelTop = "position:absolute;top:-15px;left:-1px;border-top-right-radius:.2rem;border-top-left-radius:.2rem;";
+        let labelBottom = "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem";
+        let colorScoped = '#ffcccc';
+        let colorContent = '#f8d54f';
+        let rules = [
+            "[data-scope] [data-content*=" + getDefault('scopeSymbol') + "],"+
+            "[data-scope] [data-effect*=" + getDefault('scopeSymbol') + "],"+
+            "[data-scope] [data-visibility*=" + getDefault('scopeSymbol') + "]"+
+            "{--data-reactive-color: " + colorScoped + "}",
+            
+            "[data-content], [data-effect], [data-visibility], [data-content-template]"+
+            "{--data-reactive-color: " + colorContent + "}"
+        ];
+    
+        document.documentElement.style.setProperty('--data-reactive-color', colorContent);
+
+        // When forced, enable all highlight types
+        const forceAll = getDefault('forceHighlightBindings');
+        
+        if (forceAll || getDefault('highlightActionData')) rules = rules.concat([
+            "[data-content]{outline:1px dashed var(--data-reactive-color);position:relative}",
+            "[data-content]::before{content:attr(data-content);" + labelBase + labelTop + "}",
+            "[data-effect]::before{content:'" + getDefault('effectSymbol') + " ' attr(data-effect);" + labelBase + labelTop + "}",
+            "[data-content][data-effect]::before{content: attr(data-content) ' " + getDefault('effectSymbol') + " ' attr(data-effect)}",
+        ]);
+
+        if (forceAll || getDefault('highlightTemplateData')) rules = rules.concat([ 
+            "[data-content-template]{outline:1px dashed var(--data-reactive-color);position:relative}",
+            "[data-content-template]::before{content:'" + getDefault('templateSymbol') + " ' attr(data-content-template);" + labelBase + labelTop + "}",
+        ]);
+
+        if (forceAll || getDefault('highlightVisibilityData')) rules = rules.concat([	
+            "[data-visibility]::before{content:'" + getDefault('visibilitySymbol') + " ' attr(data-visibility);" + labelBase + labelTop + "}",
+        ]);
+
+        if (forceAll || getDefault('highlightScopeData')) rules = rules.concat([	
+            "[data-scope]{--data-reactive-color:" + colorScoped + "; outline:1px dashed var(--data-reactive-color);}",				
+            "[data-scope]::after{content:attr(data-scope);" + labelBase + labelBottom + "}",
+        ]);
+
+        if ((forceAll || getDefault('highlightActionData')) && (forceAll || getDefault('highlightVisibilityData'))) rules = rules.concat([	
+            "[data-content][data-visibility]:not([data-effect])::before{content: attr(data-content) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
+            "[data-effect][data-visibility]:not([data-content])::before{content: ' " + getDefault('effectSymbol') + " ' attr(data-effect) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
+            "[data-content][data-effect][data-visibility]::before{content: attr(data-content)  ' " + getDefault('effectSymbol') + " ' attr(data-effect) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
+        ]);
+
+        if (forceAll || getDefault('highlightVisibilityArea')) rules = rules.concat([	
+            "[data-visibility]:not([data-scope])::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--data-reactive-color) 10px,var(--data-reactive-color) 20px);opacity: .1;}",
+        ]);
+
+        // When forced (debug mode), also include visibility mode rules and redraw overlay
+        if (forceAll) {
+            // Redraw overlay styles
+            rules.push(
+                ".hype-reactive-redraw-overlay {" +
+                "box-sizing: border-box;" +
+                "background-color: rgba(255, 0, 0, 0.2);" +
+                "border: 1px solid rgba(255, 0, 0, 0.5);" +
+                "}"
+            );
+            
+            // Visibility mode rules
+            let visibilityMode = getDefault('visibilityMode');
+            switch (visibilityMode) {
+                case 'auto':
+                    rules.push(
+                        "[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
+                    );
+                    break;
+                case 'manual':
+                    rules.push(
+                        "[style*=\"visibility: hidden\"] .inheritVisibility { visibility: hidden !important; }",
+                        ".propagateVisibility[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
+                    );
+                    break;
+            }
+        }
+    
+        // Create a dedicated style element for easy removal
+        _bindingHighlightStyleEl = document.createElement('style');
+        _bindingHighlightStyleEl.id = 'hype-reactive-binding-highlights';
+        _bindingHighlightStyleEl.textContent = rules.join('\n');
+        document.head.appendChild(_bindingHighlightStyleEl);
+    }
+    
+    function removeBindingHighlights() {
+        if (_bindingHighlightStyleEl) {
+            _bindingHighlightStyleEl.remove();
+            _bindingHighlightStyleEl = null;
+        }
+        setDefault('forceHighlightBindings', false);
+    }
+    
     if (_isHypeIDE) {
         window.addEventListener("DOMContentLoaded", function (event) {
             if (getDefault('highlightReactiveContent')) {
-
-                let labelBase = "font-family:Helvetica,Arial;line-height:11px;font-size:9px;font-weight:normal;padding:2px 5px;white-space:nowrap;max-height:16px;color:#000;text-align:center;background-color:var(--data-reactive-color);";
-                let labelTop = "position:absolute;top:-15px;left:-1px;border-top-right-radius:.2rem;border-top-left-radius:.2rem;";
-                let labelBottom = "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem"
-                let colorScoped = '#ffcccc';
-                let colorContent = '#f8d54f';
-                let rules = [
-                    "[data-scope] [data-content*=" + getDefault('scopeSymbol') + "],"+
-                    "[data-scope] [data-effect*=" + getDefault('scopeSymbol') + "],"+
-                    "[data-scope] [data-visibility*=" + getDefault('scopeSymbol') + "]"+
-                    "{--data-reactive-color: " + colorScoped + "}",
-                    
-                    "[data-content], [data-effect], [data-visibility], [data-content-template]"+
-                    "{--data-reactive-color: " + colorContent + "}"
-                ];
-            
-                document.documentElement.style.setProperty('--data-reactive-color', colorContent);
-
-                if (getDefault('highlightActionData')) rules = rules.concat([
-                    "[data-content]{outline:1px dashed var(--data-reactive-color);position:relative}",
-                    "[data-content]::before{content:attr(data-content);" + labelBase + labelTop + "}",
-                    "[data-effect]::before{content:'" + getDefault('effectSymbol') + " ' attr(data-effect);" + labelBase + labelTop + "}",
-                    "[data-content][data-effect]::before{content: attr(data-content) ' " + getDefault('effectSymbol') + " ' attr(data-effect)}",
-                ]);
-
-                if (getDefault('highlightTemplateData')) rules = rules.concat([ 
-                    "[data-content-template]{outline:1px dashed var(--data-reactive-color);position:relative}",
-                    "[data-content-template]::before{content:'" + getDefault('templateSymbol') + " ' attr(data-content-template);" + labelBase + labelTop + "}",
-                ]);
-
-                if (getDefault('highlightVisibilityData')) rules = rules.concat([	
-                    "[data-visibility]::before{content:'" + getDefault('visibilitySymbol') + " ' attr(data-visibility);" + labelBase + labelTop + "}",
-                ]);
-
-                if (getDefault('highlightScopeData')) rules = rules.concat([	
-                    "[data-scope]{--data-reactive-color:" + colorScoped + "; outline:1px dashed var(--data-reactive-color);}",				
-                    "[data-scope]::after{content:attr(data-scope);" + labelBase + labelBottom + "}",
-                ]);
-
-                if (getDefault('highlightActionData') && getDefault('highlightVisibilityData')) rules = rules.concat([	
-                    "[data-content][data-visibility]:not([data-effect])::before{content: attr(data-content) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
-                    "[data-effect][data-visibility]:not([data-content])::before{content: ' " + getDefault('effectSymbol') + " ' attr(data-effect) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
-                    "[data-content][data-effect][data-visibility]::before{content: attr(data-content)  ' " + getDefault('effectSymbol') + " ' attr(data-effect) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
-
-                ]);
-
-                if (getDefault('highlightVisibilityArea')) rules = rules.concat([	
-                    "[data-visibility]:not([data-scope])::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--data-reactive-color) 10px,var(--data-reactive-color) 20px);opacity: .1;}",
-                ]);
-            
-                rules.forEach((rule) => document.styleSheets[0].insertRule(rule, 0));
+                injectBindingHighlights();
             }
         });   
-    } else {
+    }
+
+    // Visibility mode rules - runs for all non-IDE environments
+    if (!_isHypeIDE) {
         window.addEventListener("DOMContentLoaded", function (event) {
             let visibilityMode = getDefault('visibilityMode');
             let rules = [];
     
-            // Add redraw overlay styles only in high preview mode
+            // Add redraw overlay styles only in preview mode
             if (isHypePreview()) {
                 rules.push(
                     ".hype-reactive-redraw-overlay {" +
@@ -756,7 +842,7 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
                     break;
             }
     
-            rules.forEach((rule) => document.styleSheets[0].insertRule(rule, 0));
+            if (rules.length) rules.forEach((rule) => document.styleSheets[0].insertRule(rule, 0));
         });
     }
     
@@ -766,6 +852,8 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
         getDefault: getDefault,
         enableReactiveObject: enableReactiveObject,
         disableReactiveObject: disableReactiveObject,
-        debounceByRequestFrame: debounceByRequestFrame
+        debounceByRequestFrame: debounceByRequestFrame,
+        enableBindingHighlights: injectBindingHighlights,
+        disableBindingHighlights: removeBindingHighlights
     };
 })();
