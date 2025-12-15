@@ -1,5 +1,5 @@
 /*!
-Hype Reactive Content 1.7.1
+Hype Reactive Content 1.7.2
 copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
 */
 /*
@@ -61,14 +61,20 @@ copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
 *       Exposed enableBindingHighlights and disableBindingHighlights in public API
 * 1.7.1 Fixed enableReactiveCustomData to use deep merge for nested objects
 *       This fixes intermittent issues where nested structures weren't properly merged
+* 1.7.2 Added currentElement getter to expose the element being processed during reactive refresh
+*       Useful for external code that needs element context but doesn't have access to the with() scope
 */
 
 if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (function () {
 
-    /* @const */ 
+    /* @const */
+    const _includeVisualHelpers = true;
     const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
-    const _version = '1.7.1';
+    const _version = '1.7.2';
     const customDataMap = new WeakMap();
+    
+    // Current element being processed during reactive refresh (for external access)
+    let _currentProcessingElement = null;
     const reactiveCache = new WeakMap();
 
     let _default = {
@@ -526,6 +532,9 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
             behaviorCallbacks = {};
         
             sceneElm.querySelectorAll('[data-visibility], [data-content], [data-effect], [data-content-template]').forEach(function (elm) {
+                // Set current processing element for external access (e.g., HypeMediaCache.asImage)
+                _currentProcessingElement = elm;
+                
                 let content = elm.getAttribute('data-content');
                 let visibility = elm.getAttribute('data-visibility');
                 let effect = elm.getAttribute('data-effect');
@@ -610,6 +619,9 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
                     }
                 }
             });
+            
+            // Clear current processing element after forEach completes
+            _currentProcessingElement = null;
         
             if ("HypeDataMagic" in window !== false) {
                 if (HypeDataMagic.getDefault('refreshOnCustomData')) hypeDocument.refresh();
@@ -698,122 +710,70 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
         window.HYPE_eventListeners.push({ "type": "HypeTriggerCustomBehavior", "callback": HypeTriggerCustomBehavior });
     }
     
-    // Binding highlight CSS injection - extracted for reuse
+    // Binding highlight CSS injection
     let _bindingHighlightStyleEl = null;
+    let injectBindingHighlights = function() {};
+    let removeBindingHighlights = function() {};
     
-    function injectBindingHighlights() {
-        if (_bindingHighlightStyleEl) return; // Already injected
+    if (_includeVisualHelpers) {
         
-        let labelBase = "font-family:Helvetica,Arial;line-height:11px;font-size:9px;font-weight:normal;padding:2px 5px;white-space:nowrap;max-height:16px;color:#000;text-align:center;background-color:var(--data-reactive-color);";
-        let labelTop = "position:absolute;top:-15px;left:-1px;border-top-right-radius:.2rem;border-top-left-radius:.2rem;";
-        let labelBottom = "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem";
-        let colorScoped = '#ffcccc';
-        let colorContent = '#f8d54f';
-        let rules = [
-            "[data-scope] [data-content*=" + getDefault('scopeSymbol') + "],"+
-            "[data-scope] [data-effect*=" + getDefault('scopeSymbol') + "],"+
-            "[data-scope] [data-visibility*=" + getDefault('scopeSymbol') + "]"+
-            "{--data-reactive-color: " + colorScoped + "}",
+        injectBindingHighlights = function() {
+            if (_bindingHighlightStyleEl) return; // Already injected
             
-            "[data-content], [data-effect], [data-visibility], [data-content-template]"+
-            "{--data-reactive-color: " + colorContent + "}"
-        ];
-    
-        document.documentElement.style.setProperty('--data-reactive-color', colorContent);
-
-        // When forced, enable all highlight types
-        const forceAll = getDefault('forceHighlightBindings');
+            let labelBase = "font-family:Helvetica,Arial;line-height:11px;font-size:9px;font-weight:normal;padding:2px 5px;white-space:nowrap;max-height:16px;color:#000;text-align:center;background-color:var(--data-reactive-color);";
+            let labelTop = "position:absolute;top:-15px;left:-1px;border-top-right-radius:.2rem;border-top-left-radius:.2rem;";
+            let labelBottom = "position:absolute;bottom:-15px;left:-1px;border-bottom-right-radius:.2rem;border-bottom-left-radius:.2rem";
+            let colorScoped = '#ffcccc';
+            let colorContent = '#f8d54f';
+            let rules = [
+                "[data-scope] [data-content*=" + getDefault('scopeSymbol') + "],"+
+                "[data-scope] [data-effect*=" + getDefault('scopeSymbol') + "],"+
+                "[data-scope] [data-visibility*=" + getDefault('scopeSymbol') + "]"+
+                "{--data-reactive-color: " + colorScoped + "}",
+                
+                "[data-content], [data-effect], [data-visibility], [data-content-template]"+
+                "{--data-reactive-color: " + colorContent + "}"
+            ];
         
-        if (forceAll || getDefault('highlightActionData')) rules = rules.concat([
-            "[data-content]{outline:1px dashed var(--data-reactive-color);position:relative}",
-            "[data-content]::before{content:attr(data-content);" + labelBase + labelTop + "}",
-            "[data-effect]::before{content:'" + getDefault('effectSymbol') + " ' attr(data-effect);" + labelBase + labelTop + "}",
-            "[data-content][data-effect]::before{content: attr(data-content) ' " + getDefault('effectSymbol') + " ' attr(data-effect)}",
-        ]);
+            document.documentElement.style.setProperty('--data-reactive-color', colorContent);
 
-        if (forceAll || getDefault('highlightTemplateData')) rules = rules.concat([ 
-            "[data-content-template]{outline:1px dashed var(--data-reactive-color);position:relative}",
-            "[data-content-template]::before{content:'" + getDefault('templateSymbol') + " ' attr(data-content-template);" + labelBase + labelTop + "}",
-        ]);
-
-        if (forceAll || getDefault('highlightVisibilityData')) rules = rules.concat([	
-            "[data-visibility]::before{content:'" + getDefault('visibilitySymbol') + " ' attr(data-visibility);" + labelBase + labelTop + "}",
-        ]);
-
-        if (forceAll || getDefault('highlightScopeData')) rules = rules.concat([	
-            "[data-scope]{--data-reactive-color:" + colorScoped + "; outline:1px dashed var(--data-reactive-color);}",				
-            "[data-scope]::after{content:attr(data-scope);" + labelBase + labelBottom + "}",
-        ]);
-
-        if ((forceAll || getDefault('highlightActionData')) && (forceAll || getDefault('highlightVisibilityData'))) rules = rules.concat([	
-            "[data-content][data-visibility]:not([data-effect])::before{content: attr(data-content) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
-            "[data-effect][data-visibility]:not([data-content])::before{content: ' " + getDefault('effectSymbol') + " ' attr(data-effect) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
-            "[data-content][data-effect][data-visibility]::before{content: attr(data-content)  ' " + getDefault('effectSymbol') + " ' attr(data-effect) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
-        ]);
-
-        if (forceAll || getDefault('highlightVisibilityArea')) rules = rules.concat([	
-            "[data-visibility]:not([data-scope])::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--data-reactive-color) 10px,var(--data-reactive-color) 20px);opacity: .1;}",
-        ]);
-
-        // When forced (debug mode), also include visibility mode rules and redraw overlay
-        if (forceAll) {
-            // Redraw overlay styles
-            rules.push(
-                ".hype-reactive-redraw-overlay {" +
-                "box-sizing: border-box;" +
-                "background-color: rgba(255, 0, 0, 0.2);" +
-                "border: 1px solid rgba(255, 0, 0, 0.5);" +
-                "}"
-            );
+            // When forced, enable all highlight types
+            const forceAll = getDefault('forceHighlightBindings');
             
-            // Visibility mode rules
-            let visibilityMode = getDefault('visibilityMode');
-            switch (visibilityMode) {
-                case 'auto':
-                    rules.push(
-                        "[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
-                    );
-                    break;
-                case 'manual':
-                    rules.push(
-                        "[style*=\"visibility: hidden\"] .inheritVisibility { visibility: hidden !important; }",
-                        ".propagateVisibility[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
-                    );
-                    break;
-            }
-        }
-    
-        // Create a dedicated style element for easy removal
-        _bindingHighlightStyleEl = document.createElement('style');
-        _bindingHighlightStyleEl.id = 'hype-reactive-binding-highlights';
-        _bindingHighlightStyleEl.textContent = rules.join('\n');
-        document.head.appendChild(_bindingHighlightStyleEl);
-    }
-    
-    function removeBindingHighlights() {
-        if (_bindingHighlightStyleEl) {
-            _bindingHighlightStyleEl.remove();
-            _bindingHighlightStyleEl = null;
-        }
-        setDefault('forceHighlightBindings', false);
-    }
-    
-    if (_isHypeIDE) {
-        window.addEventListener("DOMContentLoaded", function (event) {
-            if (getDefault('highlightReactiveContent')) {
-                injectBindingHighlights();
-            }
-        });   
-    }
+            if (forceAll || getDefault('highlightActionData')) rules = rules.concat([
+                "[data-content]{outline:1px dashed var(--data-reactive-color);position:relative}",
+                "[data-content]::before{content:attr(data-content);" + labelBase + labelTop + "}",
+                "[data-effect]::before{content:'" + getDefault('effectSymbol') + " ' attr(data-effect);" + labelBase + labelTop + "}",
+                "[data-content][data-effect]::before{content: attr(data-content) ' " + getDefault('effectSymbol') + " ' attr(data-effect)}",
+            ]);
 
-    // Visibility mode rules - runs for all non-IDE environments
-    if (!_isHypeIDE) {
-        window.addEventListener("DOMContentLoaded", function (event) {
-            let visibilityMode = getDefault('visibilityMode');
-            let rules = [];
-    
-            // Add redraw overlay styles only in preview mode
-            if (isHypePreview()) {
+            if (forceAll || getDefault('highlightTemplateData')) rules = rules.concat([ 
+                "[data-content-template]{outline:1px dashed var(--data-reactive-color);position:relative}",
+                "[data-content-template]::before{content:'" + getDefault('templateSymbol') + " ' attr(data-content-template);" + labelBase + labelTop + "}",
+            ]);
+
+            if (forceAll || getDefault('highlightVisibilityData')) rules = rules.concat([	
+                "[data-visibility]::before{content:'" + getDefault('visibilitySymbol') + " ' attr(data-visibility);" + labelBase + labelTop + "}",
+            ]);
+
+            if (forceAll || getDefault('highlightScopeData')) rules = rules.concat([	
+                "[data-scope]{--data-reactive-color:" + colorScoped + "; outline:1px dashed var(--data-reactive-color);}",				
+                "[data-scope]::after{content:attr(data-scope);" + labelBase + labelBottom + "}",
+            ]);
+
+            if ((forceAll || getDefault('highlightActionData')) && (forceAll || getDefault('highlightVisibilityData'))) rules = rules.concat([	
+                "[data-content][data-visibility]:not([data-effect])::before{content: attr(data-content) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
+                "[data-effect][data-visibility]:not([data-content])::before{content: ' " + getDefault('effectSymbol') + " ' attr(data-effect) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
+                "[data-content][data-effect][data-visibility]::before{content: attr(data-content)  ' " + getDefault('effectSymbol') + " ' attr(data-effect) ' " + getDefault('visibilitySymbol') + " ' attr(data-visibility)}",
+            ]);
+
+            if (forceAll || getDefault('highlightVisibilityArea')) rules = rules.concat([	
+                "[data-visibility]:not([data-scope])::after {content:'';position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-image:repeating-linear-gradient(45deg,transparent,transparent 10px,var(--data-reactive-color) 10px,var(--data-reactive-color) 20px);opacity: .1;}",
+            ]);
+
+            // When forced (debug mode), also include visibility mode rules and redraw overlay
+            if (forceAll) {
+                // Redraw overlay styles
                 rules.push(
                     ".hype-reactive-redraw-overlay {" +
                     "box-sizing: border-box;" +
@@ -821,35 +781,94 @@ if ("HypeReactiveContent" in window === false) window['HypeReactiveContent'] = (
                     "border: 1px solid rgba(255, 0, 0, 0.5);" +
                     "}"
                 );
+                
+                // Visibility mode rules
+                let visibilityMode = getDefault('visibilityMode');
+                switch (visibilityMode) {
+                    case 'auto':
+                        rules.push(
+                            "[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
+                        );
+                        break;
+                    case 'manual':
+                        rules.push(
+                            "[style*=\"visibility: hidden\"] .inheritVisibility { visibility: hidden !important; }",
+                            ".propagateVisibility[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
+                        );
+                        break;
+                }
             }
-
-            switch (visibilityMode) {
-                case 'auto':
-                    rules.push(
-                        "[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
-                    );
-                    break;
-
-                case 'manual':
-                    rules.push(
-                        "[style*=\"visibility: hidden\"] .inheritVisibility { visibility: hidden !important; }",
-                        ".propagateVisibility[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
-                    );
-                    break;
-
-                case 'none':
-                default:
-                    break;
+        
+            // Create a dedicated style element for easy removal
+            _bindingHighlightStyleEl = document.createElement('style');
+            _bindingHighlightStyleEl.id = 'hype-reactive-binding-highlights';
+            _bindingHighlightStyleEl.textContent = rules.join('\n');
+            document.head.appendChild(_bindingHighlightStyleEl);
+        }
+        
+        removeBindingHighlights = function() {
+            if (_bindingHighlightStyleEl) {
+                _bindingHighlightStyleEl.remove();
+                _bindingHighlightStyleEl = null;
             }
+            setDefault('forceHighlightBindings', false);
+        };
+        
+        if (_isHypeIDE) {
+            window.addEventListener("DOMContentLoaded", function (event) {
+                if (getDefault('highlightReactiveContent')) {
+                    injectBindingHighlights();
+                }
+            });   
+        }
+
+        // Visibility mode rules - runs for all non-IDE environments
+        if (!_isHypeIDE) {
+            window.addEventListener("DOMContentLoaded", function (event) {
+                let visibilityMode = getDefault('visibilityMode');
+                let rules = [];
+        
+                // Add redraw overlay styles only in preview mode
+                if (isHypePreview()) {
+                    rules.push(
+                        ".hype-reactive-redraw-overlay {" +
+                        "box-sizing: border-box;" +
+                        "background-color: rgba(255, 0, 0, 0.2);" +
+                        "border: 1px solid rgba(255, 0, 0, 0.5);" +
+                        "}"
+                    );
+                }
+
+                switch (visibilityMode) {
+                    case 'auto':
+                        rules.push(
+                            "[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
+                        );
+                        break;
+
+                    case 'manual':
+                        rules.push(
+                            "[style*=\"visibility: hidden\"] .inheritVisibility { visibility: hidden !important; }",
+                            ".propagateVisibility[data-visibility][style*=\"visibility: hidden\"] [data-visibility] { visibility: hidden !important; }"
+                        );
+                        break;
+
+                    case 'none':
+                    default:
+                        break;
+                }
+        
+                if (rules.length) rules.forEach((rule) => document.styleSheets[0].insertRule(rule, 0));
+            });
+        }
     
-            if (rules.length) rules.forEach((rule) => document.styleSheets[0].insertRule(rule, 0));
-        });
-    }
+    } // end _includeVisualHelpers
     
     return {
         version:  _version,
         setDefault: setDefault,
         getDefault: getDefault,
+        get currentElement() { return _currentProcessingElement; },
         enableReactiveObject: enableReactiveObject,
         disableReactiveObject: disableReactiveObject,
         debounceByRequestFrame: debounceByRequestFrame,
